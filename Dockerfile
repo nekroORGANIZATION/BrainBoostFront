@@ -7,7 +7,7 @@ COPY tsconfig.json ./
 COPY next.config.ts ./
 COPY . .
 
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npm run build
 
 # Етап 2: Запуск продакшен сервера

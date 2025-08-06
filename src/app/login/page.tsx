@@ -9,19 +9,20 @@ export default function LoginPage() {
     const { login } = useAuth();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
+    const [showResetModal, setShowResetModal] = useState(false);
+
+    const [resetEmail, setResetEmail] = useState('');
+    const [resetMessage, setResetMessage] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
         const username = formData.get('username') as string;
         const password = formData.get('password') as string;
-
         try {
             const res = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password }),
             });
 
@@ -38,9 +39,7 @@ export default function LoginPage() {
             localStorage.setItem('refresh', data.refresh);
 
             const profileRes = await fetch('http://127.0.0.1:8000/accounts/api/profile/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
 
             if (!profileRes.ok) {
@@ -60,11 +59,30 @@ export default function LoginPage() {
         }
     };
 
+    const handleReset = async () => {
+        try {
+            const res = await fetch('http://127.0.0.1:8000/accounts/reset-password/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: resetEmail }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setResetMessage(data.error || 'Помилка скидання пароля.');
+            } else {
+                setResetMessage('Новий пароль надіслано на пошту.');
+            }
+        } catch (err) {
+            setResetMessage('Серверна помилка.');
+        }
+    };
+
     return (
-        <div className="flex h-screen overflow-hidden">
-            {/* Left side */}
+        <div className="flex h-screen overflow-hidden relative">
+            {/* Left Side */}
             <div className="w-full md:w-1/2 flex flex-col px-16 py-12">
-                {/* ЛОГО */}
                 <Link href="/" className="text-2xl font-extrabold text-blue-700 hover:underline mb-10">
                     BrainBoost
                 </Link>
@@ -109,16 +127,17 @@ export default function LoginPage() {
                         type="button"
                         className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition"
                     >
-                        <img
-                            src="/images/google-login.png"
-                            alt="Google"
-                            className="w-5 h-5"
-                        />
+                        <img src="/images/google-login.png" alt="Google" className="w-5 h-5" />
                         <span className="text-md font-medium">Sign in with Google</span>
                     </button>
 
                     <div className="text-center text-sm text-gray-500 mt-6">
-                        <a href="#" className="hover:underline">Не памʼятаю пароль</a>
+                        <button
+                            onClick={() => setShowResetModal(true)}
+                            className="hover:underline"
+                        >
+                            Не памʼятаю пароль
+                        </button>
                     </div>
 
                     <div className="text-center text-sm text-gray-500 mt-2">
@@ -136,6 +155,43 @@ export default function LoginPage() {
                     className="w-full h-full object-cover"
                 />
             </div>
+
+            {/* Modal */}
+            {showResetModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/10">
+                    <div className="bg-white rounded-2xl shadow-xl w-[90%] max-w-md p-8 relative">
+                        <button
+                            onClick={() => setShowResetModal(false)}
+                            className="absolute top-4 right-4 text-2xl text-gray-500 hover:text-black"
+                        >
+                            ×
+                        </button>
+
+                        <h2 className="text-xl font-semibold text-center text-gray-900 mb-6">
+                            Введіть електронну адресу<br /> або номер телефону
+                        </h2>
+
+                        <input
+                            type="email"
+                            placeholder="Ваша електронна пошта"
+                            value={resetEmail}
+                            onChange={(e) => setResetEmail(e.target.value)}
+                            className="w-full border border-gray-300 rounded-xl p-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                        />
+
+                        {resetMessage && (
+                            <p className="text-center text-sm text-red-500 mb-4">{resetMessage}</p>
+                        )}
+
+                        <button
+                            onClick={handleReset}
+                            className="w-full border border-blue-500 text-blue-700 text-lg py-3 rounded-xl font-semibold hover:bg-blue-50 transition"
+                        >
+                            Далі
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

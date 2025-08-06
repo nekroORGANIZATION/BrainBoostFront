@@ -7,20 +7,16 @@ export default function UserDetailsForm({ onNext, onBack, updateData, values }: 
   const [email, setEmail] = useState(values?.email || '');
   const [password, setPassword] = useState(values?.password || '');
 
-  // При изменении локального стейта — сразу обновляем общий formData
   useEffect(() => {
     updateData({ name, email, password });
   }, [name, email, password]);
 
   return (
     <div className="relative min-h-screen bg-white flex items-center justify-center px-4">
-      {/* Логотип */}
       <div className="absolute top-8 left-8 text-xl font-bold text-blue-950">LOGO</div>
 
-      {/* Синяя фигура внизу слева */}
       <div className="absolute top-150 left-0 w-64 h-64 bg-blue-600 clip-diagonal" />
 
-      {/* Форма */}
       <div className="w-full max-w-md">
         <h1 className="text-4xl font-bold mb-8">Реєстрація</h1>
 

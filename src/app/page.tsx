@@ -50,7 +50,7 @@ export default function Home() {
           <p className="tagline">
             Простір для тих, хто хоче увійти в ІТ або прокачати свої навички.
           </p>
-          <a href="#" className="cta">Хочу вчитись в Brainboost</a>
+          <a href="/courses" className="cta">Хочу вчитись в Brainboost</a>
         </div>
 
         <div className="hero-right">

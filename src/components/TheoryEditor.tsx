@@ -9,11 +9,10 @@ import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import { Underline } from '@tiptap/extension-underline';
 import { TextAlign } from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
 
-// Імпорт твого кастомного BubbleMenu React компонента
-import BubbleMenu from './BubbleMenu';  // поправ шлях, якщо потрібно
+import BubbleMenu from './BubbleMenu';
 
-// Кастомне розширення для розміру шрифту (залишаємо без змін)
 const FontSize = Extension.create({
   name: 'fontSize',
 
@@ -32,12 +31,8 @@ const FontSize = Extension.create({
             default: null,
             parseHTML: element => element.style.fontSize?.replace(/['"]+/g, '') || null,
             renderHTML: attributes => {
-              if (!attributes.fontSize) {
-                return {};
-              }
-              return {
-                style: `font-size: ${attributes.fontSize}`,
-              };
+              if (!attributes.fontSize) return {};
+              return { style: `font-size: ${attributes.fontSize}` };
             },
           },
         },
@@ -49,14 +44,10 @@ const FontSize = Extension.create({
     return {
       setFontSize:
         (fontSize: string) =>
-        ({ chain }) => {
-          return chain().setMark('textStyle', { fontSize }).run();
-        },
+        ({ chain }) => chain().setMark('textStyle', { fontSize }).run(),
       unsetFontSize:
         () =>
-        ({ chain }) => {
-          return chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run();
-        },
+        ({ chain }) => chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
     };
   },
 });
@@ -79,12 +70,17 @@ const TheoryEditor: React.FC<TheoryEditorProps> = ({ initialContent, onSave }) =
   const editor = useEditor({
     extensions: [
       StarterKit,
-      BubbleMenuExtension, // обов’язково додай це розширення сюди!
+      BubbleMenuExtension,
       Underline,
       TextStyle,
       Color,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       FontSize,
+      Link.configure({
+        openOnClick: true,
+        autolink: true,
+        linkOnPaste: true,
+      }),
     ],
     content: initialContent,
     onUpdate: ({ editor }) => {
@@ -130,9 +126,7 @@ const TheoryEditor: React.FC<TheoryEditorProps> = ({ initialContent, onSave }) =
 
   return (
     <div className="relative border rounded-md p-4">
-      {/* Панель інструментів зверху */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {/* Кнопки форматування зверху */}
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={editor.isActive('bold') ? 'font-bold bg-gray-300 px-2 rounded' : 'px-2 rounded'}
@@ -219,12 +213,41 @@ const TheoryEditor: React.FC<TheoryEditorProps> = ({ initialContent, onSave }) =
             </option>
           ))}
         </select>
+
+        {/* 🔗 Гіперпосилання */}
+        <button
+          onClick={() => {
+            const url = prompt('Введіть URL посилання:');
+            if (url) {
+              editor
+                .chain()
+                .focus()
+                .extendMarkRange('link')
+                .setLink({ href: url })
+                .run();
+            }
+          }}
+          className="px-2 rounded bg-blue-500 text-white"
+          type="button"
+        >
+          🔗 Посилання
+        </button>
+        <button
+          onClick={() => editor.chain().focus().unsetLink().run()}
+          className="px-2 rounded bg-red-500 text-white"
+          type="button"
+        >
+          ❌ Без посилання
+        </button>
       </div>
 
-      {/* Кнопки Зберегти та Повернутися */}
       <div className="flex justify-between mb-4">
         <button
-          onClick={() => { onSave(editor.getHTML()); setShowMessage(true); setTimeout(() => setShowMessage(false), 3000); }}
+          onClick={() => {
+            onSave(editor.getHTML());
+            setShowMessage(true);
+            setTimeout(() => setShowMessage(false), 3000);
+          }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
           type="button"
         >
@@ -242,73 +265,42 @@ const TheoryEditor: React.FC<TheoryEditorProps> = ({ initialContent, onSave }) =
         </button>
       </div>
 
-      {/* Повідомлення про збереження */}
       {showMessage && (
         <div className="mb-4 px-4 py-2 rounded bg-green-100 text-green-800 border border-green-400 shadow-sm">
           ✅ Збережено успішно!
         </div>
       )}
 
-      {/* Плаваюче меню */}
       <BubbleMenu editor={editor}>
+        {/* інші кнопки */}
         <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
-          className={editor.isActive('bold') ? 'font-bold text-blue-600' : ''}
-          aria-label="Bold"
+          onClick={() => {
+            const url = prompt('Введіть URL посилання:');
+            if (url) {
+              editor
+                .chain()
+                .focus()
+                .extendMarkRange('link')
+                .setLink({ href: url })
+                .run();
+            }
+          }}
+          className="text-blue-600"
+          aria-label="Link"
           type="button"
         >
-          <b>B</b>
+          🔗
         </button>
         <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={editor.isActive('italic') ? 'italic text-blue-600' : ''}
-          aria-label="Italic"
+          onClick={() => editor.chain().focus().unsetLink().run()}
+          className="text-red-600"
+          aria-label="Unlink"
           type="button"
         >
-          <i>I</i>
+          ❌
         </button>
-        <button
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
-          className={editor.isActive('underline') ? 'underline text-blue-600' : ''}
-          aria-label="Underline"
-          type="button"
-        >
-          U
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('left').run()}
-          className={editor.isActive({ textAlign: 'left' }) ? 'text-blue-600' : ''}
-          aria-label="Align Left"
-          type="button"
-        >
-          ⬅️
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('center').run()}
-          className={editor.isActive({ textAlign: 'center' }) ? 'text-blue-600' : ''}
-          aria-label="Align Center"
-          type="button"
-        >
-          ↔️
-        </button>
-        <button
-          onClick={() => editor.chain().focus().setTextAlign('right').run()}
-          className={editor.isActive({ textAlign: 'right' }) ? 'text-blue-600' : ''}
-          aria-label="Align Right"
-          type="button"
-        >
-          ➡️
-        </button>
-        <input
-          type="color"
-          onInput={(e) => editor.chain().focus().setColor(e.currentTarget.value).run()}
-          value={editor.getAttributes('textStyle').color || '#000000'}
-          title="Text color"
-          className="w-6 h-6 p-0 border-none"
-        />
       </BubbleMenu>
 
-      {/* Основний редактор */}
       <EditorContent editor={editor} className="min-h-[300px] border rounded p-3" />
     </div>
   );

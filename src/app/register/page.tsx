@@ -1,42 +1,52 @@
 'use client';
+
 import { useState } from 'react';
-import { login, register } from '../../services/AuthService';
+import RoleSelection from '@/app/register/RoleSelection';
+import UserDetailsForm from '@/app/register/UserDetailsForm';
+import BirthDateForm from '@/app/register/BirthDateForm';
 
-export default function AuthPage() {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [email, setEmail] = useState('');
-    const [accessToken, setAccessToken] = useState<string | null>(null);
+export default function RegisterPage() {
+    const [step, setStep] = useState(1);
+    const [formData, setFormData] = useState({
+        role: '',
+        name: '',
+        email: '',
+        password: '',
+        birthDate: '',
+    });
 
-    const handleRegister = async () => {
-        try {
-            await register(username, email, password);
-            alert('User registered!');
-        } catch (e) {
-            alert('Registration error');
-        }
-    };
+    const nextStep = () => setStep(step + 1);
+    const prevStep = () => setStep(step - 1);
 
-    const handleLogin = async () => {
-        try {
-            const data = await login(username, password);
-            setAccessToken(data.access);
-            localStorage.setItem('refreshToken', data.refresh);
-            alert('Login successful!');
-        } catch (e) {
-            alert('Login error');
-        }
+    const updateData = (data: Partial<typeof formData>) => {
+        setFormData({ ...formData, ...data });
     };
 
     return (
-        <div className="p-4" style={{ maxWidth: '400px', margin: '0 auto', backgroundColor: 'white' }}>
-            <input type="text" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-            <input type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
-            <input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+        <>
+        {step === 1 && (
+            <RoleSelection
+            onNext={nextStep}
+            updateData={updateData}
+            />
+        )}
 
-            <button onClick={handleRegister}>Register</button>
+        {step === 2 && (
+            <UserDetailsForm
+            onNext={nextStep}
+            onBack={prevStep}
+            updateData={updateData}
+            values={formData}
+            />
+        )}
 
-            {accessToken && <p>Access Token: {accessToken.slice(0, 20)}...</p>}
-        </div>
+        {step === 3 && (
+            <BirthDateForm
+            onBack={prevStep}
+            updateData={updateData}
+            values={formData}
+            />
+        )}
+        </>
     );
 }

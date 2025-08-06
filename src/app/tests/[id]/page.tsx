@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { submitAnswers } from '@/services/submitAnswers';
+import { submitAnswers } from '@/services/SubmitAnswers';
 
 const TestPage = () => {
   const [answers, setAnswers] = useState([]);

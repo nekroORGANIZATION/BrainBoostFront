@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import axios from 'axios';
+import axios, {AxiosError} from 'axios';
 import TheoryEditor from '@/components/TheoryEditor';
 import { MessageSquare } from 'lucide-react';
 
@@ -84,21 +84,44 @@ export default function TheoryPage() {
               placeholder="Напиши повідомлення..."
             />
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!userInput.trim()) return;
-                setChatMessages((prev) => [...prev, { role: 'user', text: userInput }]);
-                setTimeout(() => {
+
+                const userMessage = { role: 'user', text: userInput };
+                setChatMessages((prev) => [...prev, userMessage]);
+                setUserInput('');
+
+                try {
+                  const res = await axios.post(
+                    'http://127.0.0.1:8000/api/ai/ask/',
+                    {
+                      lesson_id: id,
+                      question: userInput,
+                    },
+                    {
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('access')}`,
+                      },
+                    }
+                  );
+
+                  const aiMessage = { role: 'assistant', text: res.data.answer };
+                  setChatMessages((prev) => [...prev, aiMessage]);
+                } catch (error) {
+                  const err = error as AxiosError<any>;
+                  const errText = err.response?.data?.error || 'Помилка з боку ШІ.';
                   setChatMessages((prev) => [
                     ...prev,
-                    { role: 'assistant', text: '🤖 Тут буде відповідь ШІ.' },
+                    { role: 'assistant', text: `❌ ${errText}` },
                   ]);
-                }, 1000);
-                setUserInput('');
+                }
               }}
               className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700"
             >
               ➤
             </button>
+
           </div>
         </div>
       )}

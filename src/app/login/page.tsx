@@ -77,7 +77,7 @@ export default function LoginPage() {
                             <label htmlFor="username" className="text-md text-gray-700 mb-1 block">E-mail</label>
                             <input
                                 name="username"
-                                type="email"
+                                type="username"
                                 required
                                 className="w-full border border-gray-300 rounded-xl p-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
                     <div className="text-center text-sm text-gray-500 mt-2">
                         Немає акаунту?{' '}
-                        <a href="#" className="text-gray-600 hover:underline">Зареєструватися</a>
+                        <a href="/register" className="text-gray-600 hover:underline">Зареєструватися</a>
                     </div>
                 </div>
             </div>

@@ -21,7 +21,7 @@ export default function AuthPage() {
         try {
             const data = await login(username, password);
             setAccessToken(data.access);
-            localStorage.setItem('refreshToken', data.refresh); // або sessionStorage
+            localStorage.setItem('refreshToken', data.refresh);
             alert('Login successful!');
         } catch (e) {
             alert('Login error');

@@ -19,7 +19,7 @@ export default function TeacherRegisterPage() {
         formData.append('email', email);
         formData.append('password', password);
         Array.from(documents).forEach((file) => {
-            formData.append('documents', file); // ключ должен совпадать с DRF-сериализатором
+            formData.append('documents', file);
         });
 
         try {

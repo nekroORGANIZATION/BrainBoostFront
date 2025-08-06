@@ -29,7 +29,7 @@ export async function login(username: string, password: string) {
     });
 
     if (!res.ok) throw new Error('Login failed');
-    return res.json(); // { access: string, refresh: string }
+    return res.json();
 }
 
 export async function refreshToken(refresh: string) {

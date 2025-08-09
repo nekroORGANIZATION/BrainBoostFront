@@ -28,10 +28,10 @@ export default function CheckoutClient({ courseId }: Props) {
                 const data = await res.json();
                 return data.id;
             },
-            onApprove: async (data: any, actions: any) => {
+            onApprove: async (data: unknown, actions: unknown) => {
                 alert('Платеж подтвержден!');
             },
-            onError: (err: any) => {
+            onError: (err: unknown) => {
                 console.error('PayPal Error:', err);
                 alert('Ошибка оплаты через PayPal');
             },

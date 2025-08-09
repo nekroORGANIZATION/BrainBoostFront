@@ -60,7 +60,7 @@ export default function CreateCoursePage() {
 
       console.log('Course created:', response.data);
       router.push('/courses');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating course:', err);
       setError('Помилка при створенні курсу.');
     }

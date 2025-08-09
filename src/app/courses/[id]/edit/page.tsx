@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 
 interface Category {
   id: number;
@@ -30,7 +30,6 @@ export default function CourseEditPage() {
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-  // Завантаження курсу
   useEffect(() => {
     if (!id || !token) return;
 
@@ -117,9 +116,9 @@ export default function CourseEditPage() {
       );
 
       router.push(`/courses`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Помилка при збереженні:', err);
-      if (err.response?.data) {
+      if (isAxiosError(err) && err.response?.data) {
         console.log('Помилки від бекенду:', err.response.data);
       }
       setError('Не вдалося зберегти зміни. Перевірте обовʼязкові поля.');

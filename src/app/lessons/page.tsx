@@ -5,7 +5,7 @@ import axios from 'axios';
 import Link from 'next/link';
 
 export default function LessonsPage() {
-  const [lessons, setLessons] = useState<any[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

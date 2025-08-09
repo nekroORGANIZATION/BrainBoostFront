@@ -88,11 +88,12 @@ const CourseList = () => {
 
   const fetchCourses = async () => {
     try {
-      const params: any = {
+      const params: Record<string, string | number | undefined> = {
         ordering: sortBy,
         page: currentPage,
         search: searchTerm.trim() || undefined,
       };
+
       if (categoryFilter !== 'all') params['category__name'] = categoryFilter;
       if (languageFilter !== 'all') params['language'] = languageFilter;
 

@@ -2,7 +2,18 @@
 
 import { useState, useEffect } from 'react';
 
-export default function UserDetailsForm({ onNext, onBack, updateData, values }: any) {
+interface UserDetailsFormProps {
+  onNext: () => void;
+  onBack?: () => void;
+  updateData: (data: { name: string; email: string; password: string }) => void;
+  values: {
+    name?: string;
+    email?: string;
+    password?: string;
+  };
+}
+
+export default function UserDetailsForm({ onNext, onBack, updateData, values }: UserDetailsFormProps) {
   const [name, setName] = useState(values?.name || '');
   const [email, setEmail] = useState(values?.email || '');
   const [password, setPassword] = useState(values?.password || '');

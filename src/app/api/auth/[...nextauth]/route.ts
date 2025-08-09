@@ -1,8 +1,27 @@
-import NextAuth from "next-auth";
+import NextAuth, { type AuthOptions, type User } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import axios from "axios";
 
-const authOptions = {  // убрал export
+export interface ICustomUser {
+  id: number;
+  username: string;
+  email?: string;
+  is_email_verified: boolean;
+  is_teacher: boolean;
+  is_certified_teacher?: boolean | null;
+  profile_picture?: string | null;
+  groups?: Array<{
+    id: number;
+    name: string;
+  }>;
+  user_permissions?: Array<{
+    id: number;
+    name: string;
+    codename: string;
+  }>;
+}
+
+const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -10,8 +29,9 @@ const authOptions = {  // убрал export
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
-      console.log("🔑 Вход через Google:", user);
+    async signIn(params) {
+      const user = params.user as User & ICustomUser;
+      console.log("Вхід через Google:", user);
 
       try {
         const res = await axios.post("http://127.0.0.1:8000/accounts/api/google-login/", {
@@ -27,7 +47,7 @@ const authOptions = {  // убрал export
 
         return true;
       } catch (err) {
-        console.error("❌ Ошибка входа через Google:", err);
+        console.error("Помилка входу через Google:", err);
         return false;
       }
     },

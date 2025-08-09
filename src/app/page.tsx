@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from 'next/link';
 
 const founders = [
   {
@@ -50,7 +51,7 @@ export default function Home() {
           <p className="tagline">
             Простір для тих, хто хоче увійти в ІТ або прокачати свої навички.
           </p>
-          <a href="/courses" className="cta">Хочу вчитись в Brainboost</a>
+          <Link href="/courses" className="cta">Хочу вчитись в Brainboost</Link>
         </div>
 
         <div className="hero-right">

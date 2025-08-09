@@ -109,8 +109,8 @@ export default function TheoryPage() {
                   const aiMessage = { role: 'assistant', text: res.data.answer };
                   setChatMessages((prev) => [...prev, aiMessage]);
                 } catch (error) {
-                  const err = error as AxiosError<any>;
-                  const errText = err.response?.data?.error || 'Помилка з боку ШІ.';
+                  const err = error as AxiosError<unknown>;
+                  const errText = (err.response?.data as { error?: string })?.error || 'Помилка з боку ШІ.';
                   setChatMessages((prev) => [
                     ...prev,
                     { role: 'assistant', text: `❌ ${errText}` },

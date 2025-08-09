@@ -6,9 +6,7 @@ export const getTests = async () => {
   const res = await axios.get(`${API}/tests/`);
   return res.data.results || res.data;
 };
-export const getTestById = async (id: number) => (await axios.get(`${API}/tests/${id}/`)).data;
 export const createTest = async (data: Test) => (await axios.post(`${API}/tests/`, data)).data;
-export const updateTest = async (id: number, data: Test) => (await axios.put(`${API}/tests/${id}/`, data)).data;
 export const deleteTest = async (id: number) => (await axios.delete(`${API}/tests/${id}/`)).data;
 
 export const submitAnswers = async (user_identifier: string, answers: Answer[]) => {
@@ -17,3 +15,13 @@ export const submitAnswers = async (user_identifier: string, answers: Answer[]) 
     answers,
   })).data;
 };
+
+export async function getTestById(id: number): Promise<Test> {
+  const res = await axios.get(`/tests/${id}/`);
+  return res.data;
+}
+
+export async function updateTest(id: number, data: Partial<Test>) {
+  const res = await axios.patch(`/tests/${id}/`, data);
+  return res.data;
+}

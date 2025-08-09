@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import Image from 'next/image';
 
-export default function RoleSelection({ onNext, updateData }: any) {
+interface RoleSelectionProps {
+  onNext: () => void;
+  updateData: (data: { role: string }) => void;
+}
+
+export default function RoleSelection({ onNext, updateData }: RoleSelectionProps) {
   const [selectedRole, setSelectedRole] = useState('');
 
   const handleSelect = (role: string) => {

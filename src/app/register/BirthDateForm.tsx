@@ -12,6 +12,7 @@ interface BirthDateFormProps {
     password: string;
     birthDate?: string;
   };
+  onBack?: () => void;
 }
 
 export default function BirthDateForm({ updateData, values }: BirthDateFormProps) {

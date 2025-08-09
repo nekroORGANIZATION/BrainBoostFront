@@ -3,7 +3,18 @@
 import { useState, useEffect } from 'react';
 import { register } from '@/services/AuthService';
 
-export default function BirthDateForm({ updateData, values }: any) {
+interface BirthDateFormProps {
+  updateData: (data: { birthDate: string }) => void;
+  values: {
+    role: string;
+    name: string;
+    email: string;
+    password: string;
+    birthDate?: string;
+  };
+}
+
+export default function BirthDateForm({ updateData, values }: BirthDateFormProps) {
   // Дефолтная дата
   const [day, setDay] = useState('31');
   const [month, setMonth] = useState('12');
@@ -34,7 +45,7 @@ export default function BirthDateForm({ updateData, values }: any) {
 
   const handleSubmit = async () => {
     try {
-      await register(values.role, values.name, values.email, values.password, values.birthDate);
+      await register(values.role, values.name, values.email, values.password, values.birthDate ?? '');
       alert('Реєстрація успішна!');
     } catch (err) {
       console.error(err);

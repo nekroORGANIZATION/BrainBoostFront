@@ -1,27 +1,43 @@
 import axios from 'axios';
 
+// Предполагается, что Test, Answer и др. импортируются или видны глобально
+
 const API = 'http://127.0.0.1:8000/api/tests';
+
+// Для создания теста — без id
+export type TestCreate = Omit<Test, 'id'>;
 
 export const getTests = async () => {
   const res = await axios.get(`${API}/tests/`);
   return res.data.results || res.data;
 };
-export const createTest = async (data: Test) => (await axios.post(`${API}/tests/`, data)).data;
-export const deleteTest = async (id: number) => (await axios.delete(`${API}/tests/${id}/`)).data;
+
+// В createTest используем TestCreate — без обязательного id
+export const createTest = async (data: TestCreate) => {
+  const res = await axios.post(`${API}/tests/`, data);
+  return res.data;
+};
+
+export const deleteTest = async (id: number) => {
+  const res = await axios.delete(`${API}/tests/${id}/`);
+  return res.data;
+};
 
 export const submitAnswers = async (user_identifier: string, answers: Answer[]) => {
-  return (await axios.post(`${API}/submit-answers/`, {
+  const res = await axios.post(`${API}/submit-answers/`, {
     user_identifier,
     answers,
-  })).data;
+  });
+  return res.data;
 };
 
 export async function getTestById(id: number): Promise<Test> {
-  const res = await axios.get(`/tests/${id}/`);
+  const res = await axios.get(`${API}/tests/${id}/`);
   return res.data;
 }
 
+// Для обновления — частичный Test
 export async function updateTest(id: number, data: Partial<Test>) {
-  const res = await axios.patch(`/tests/${id}/`, data);
+  const res = await axios.patch(`${API}/tests/${id}/`, data);
   return res.data;
 }

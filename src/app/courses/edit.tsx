@@ -17,7 +17,7 @@ export default function CourseEditPage() {
   });
 
   useEffect(() => {
-    axios.get(`http://127.0.0.1:8000/courses/${id}/`)
+    axios.get(`http://172.17.10.22:8000/courses/${id}/`)
       .then(res => setCourse(res.data))
       .catch(err => console.error(err));
   }, [id]);
@@ -29,7 +29,7 @@ export default function CourseEditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.put(`http://127.0.0.1:8000/courses/${id}/edit/`, course, {
+      await axios.put(`http://172.17.10.22:8000/courses/${id}/edit/`, course, {
         withCredentials: true,
       });
       router.push(`/courses/${id}`);

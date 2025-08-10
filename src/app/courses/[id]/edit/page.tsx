@@ -34,7 +34,7 @@ export default function CourseEditPage() {
     if (!id || !token) return;
 
     axios
-      .get(`http://127.0.0.1:8000/courses/${id}/`, {
+      .get(`http://172.17.10.22:8000/courses/${id}/`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then(res => {

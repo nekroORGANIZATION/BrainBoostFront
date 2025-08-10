@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Предполагается, что Test, Answer и др. импортируются или видны глобально
 
-const API = 'http://127.0.0.1:8000/api/tests';
+const API = 'http://172.17.10.22:8000/api/tests';
 
 // Для создания теста — без id
 export type TestCreate = Omit<Test, 'id'>;

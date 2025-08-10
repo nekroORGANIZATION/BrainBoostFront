@@ -18,7 +18,7 @@ export default function LoginPage() {
 
     // Создаем axios instance с interceptor
     const axiosInstance = axios.create({
-        baseURL: "http://127.0.0.1:8000/",
+        baseURL: "http://172.17.10.22:8000/",
         headers: {
             "Content-Type": "application/json",
         },
@@ -46,7 +46,7 @@ export default function LoginPage() {
             ) {
                 originalRequest._retry = true;
                 try {
-                    const res = await axios.post("http://127.0.0.1:8000/accounts/api/token/refresh/", {
+                    const res = await axios.post("http://172.17.10.22:8000/accounts/api/token/refresh/", {
                         refresh: localStorage.getItem("refresh"),
                     });
                     localStorage.setItem("access", res.data.access);
@@ -106,7 +106,7 @@ export default function LoginPage() {
 
     const handleReset = async () => {
         try {
-            const res = await axios.post('http://127.0.0.1:8000/accounts/reset-password/', {
+            const res = await axios.post('http://172.17.10.22:8000/accounts/reset-password/', {
                 email: resetEmail,
             });
 

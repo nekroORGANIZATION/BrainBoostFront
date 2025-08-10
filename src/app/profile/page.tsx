@@ -28,7 +28,7 @@ export default function ProfilePage() {
             console.log('accessToken:', accessToken);
 
             try {
-                const res = await axios.get('http://127.0.0.1:8000/accounts/api/profile/', {
+                const res = await axios.get('http://172.17.10.22:8000/accounts/api/profile/', {
                     headers: {
                         Authorization: `Bearer ${accessToken}`
                     }
@@ -52,7 +52,7 @@ export default function ProfilePage() {
             <h1 className="text-xl font-bold mb-4">Профіль користувача</h1>
             <div className="flex items-center gap-4 mb-4">
                 <img
-                    src={`http://127.0.0.1:8000${profile.profile_picture}`}
+                    src={`http://172.17.10.22:8000${profile.profile_picture}`}
                     alt="Аватар"
                     className="w-20 h-20 rounded-full object-cover"
                 />

@@ -51,7 +51,7 @@ export default function CreateCoursePage() {
     if (image) formData.append('image', image);
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/courses/', formData, {
+      const response = await axios.post('http://172.17.10.22:8000/courses/', formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',

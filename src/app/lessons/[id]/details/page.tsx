@@ -27,7 +27,7 @@ export default function LessonDetailsPage() {
     if (!id) return;
 
     axios
-      .get(`http://127.0.0.1:8000/api/lesson/lessons/${id}/`)
+      .get(`http://172.17.10.22:8000/api/lesson/lessons/${id}/`)
       .then((res) => {
         console.log('📦 Дані уроку:', res.data);
         setLesson(res.data);
@@ -60,7 +60,7 @@ export default function LessonDetailsPage() {
             />
             {lesson.theories[lesson.theories.length - 1].image && (
               <img
-                src={`http://127.0.0.1:8000${lesson.theories[lesson.theories.length - 1].image}`}
+                src={`http://172.17.10.22:8000${lesson.theories[lesson.theories.length - 1].image}`}
                 alt="Ілюстрація до теорії"
                 className="mt-4 rounded shadow"
               />

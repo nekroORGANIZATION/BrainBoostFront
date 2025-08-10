@@ -1,7 +1,7 @@
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const res = await fetch('http://localhost:8000/create-crypto-payment/', {
+  const res = await fetch('http://172.17.10.22:8000/create-crypto-payment/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

@@ -34,7 +34,7 @@ const authOptions: AuthOptions = {
       console.log("Вхід через Google:", user);
 
       try {
-        const res = await axios.post("http://127.0.0.1:8000/accounts/api/google-login/", {
+        const res = await axios.post("http://172.17.10.22:8000/accounts/api/google-login/", {
           email: user.email,
         });
 

@@ -19,7 +19,7 @@ export default function LessonPage() {
     useEffect(() => {
         if (!id) return;
         axios
-            .get(`http://127.0.0.1:8000/api/lessons/${id}/`)
+            .get(`http://172.17.10.22:8000/api/lessons/${id}/`)
             .then((res) => setLesson(res.data))
             .catch((err) => console.error('Помилка завантаження уроку:', err))
             .finally(() => setLoading(false));

@@ -56,7 +56,7 @@ export default function CourseDetail() {
   const fetchUser = async () => {
     if (!token) return;
     try {
-      const res = await axios.get('http://127.0.0.1:8000/courses/all/users/me/', {
+      const res = await axios.get('http://172.17.10.22:8000/courses/all/users/me/', {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUser({

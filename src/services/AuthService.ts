@@ -7,7 +7,7 @@ export async function register(
     password: string,
     birthDate: string
 ) {
-    const response = await axios.post('http://127.0.0.1:8000/accounts/api/register/', {
+    const response = await axios.post('http://172.17.10.22:8000/accounts/api/register/', {
         role,
         username: name,
         email,

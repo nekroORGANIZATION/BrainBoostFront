@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 const founders = [
   {
-    name: "Анна Мельник",
+    name: "Анастасія Мельник",
     title: "CEO",
     image: "/images/founder1.png",
     quote:

@@ -11,7 +11,6 @@ jobs:
   deploy:
     runs-on: self-hosted
     environment: dev
-
     steps:
       - uses: actions/checkout@v4
 
@@ -34,23 +33,51 @@ jobs:
         shell: bash
         run: |
           RSYNC_RSH="ssh -i ${{ runner.temp }}/k -p $PORT -o StrictHostKeyChecking=no"
-          ssh -i "${{ runner.temp }}/k" -p "$PORT" -o StrictHostKeyChecking=no "$USER@$HOST" "mkdir -p /opt/brainboost/src/frontend"
+          ssh -i "${{ runner.temp }}/k" -p "$PORT" -o StrictHostKeyChecking=no "$USER@$HOST" \
+            "mkdir -p /opt/brainboost/src/frontend"
           rsync -az --delete --exclude ".git" --exclude "node_modules" --exclude ".github" \
             -e "$RSYNC_RSH" ./ "$USER@$HOST:/opt/brainboost/src/frontend/"
 
-      - name: Build & up frontend on 3000
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ env.HOST }}
-          username: ${{ env.USER }}
-          key: ${{ secrets.TARGET_SSH_KEY }}
-          port: ${{ env.PORT }}
-          script: |
+      - name: Stop old container & image
+        shell: bash
+        run: |
+          ssh -i "${{ runner.temp }}/k" -p "$PORT" -o StrictHostKeyChecking=no "$USER@$HOST" '
+            docker stop brainboost-front || true
+            docker rm   brainboost-front || true
+            docker rmi  brainboost-front:latest || true
+          '
+
+      - name: Build frontend image on Tester
+        shell: bash
+        run: |
+          ssh -i "${{ runner.temp }}/k" -p "$PORT" -o StrictHostKeyChecking=no "$USER@$HOST" '
+            set -e
+            cd /opt/brainboost/src/frontend
           
-            docker ps --filter "name=brainboost-front" -q | xargs -r docker rm -f || true
+            docker build \
+              --build-arg BUILD_SHA='${{ github.sha }}' \
+              -t brainboost-front:latest .
+          '
 
-            
-            docker compose -f /home/tester/BrainBoostFront/docker-compose.dev.yml build web
+      - name: Run frontend on port 3000
+        shell: bash
+        run: |
+          ssh -i "${{ runner.temp }}/k" -p "$PORT" -o StrictHostKeyChecking=no "$USER@$HOST" '
+            set -e
+           
+            docker run -d --name brainboost-front --restart unless-stopped \
+              -p 3000:3000 brainboost-front:latest
 
-            
-            docker compose -f /home/tester/BrainBoostFront/docker-compose.dev.yml up -d --force-recreate web
+            echo "Waiting for http://127.0.0.1:3000 ..."
+            for i in $(seq 1 60); do
+              code="$(curl -s -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || true)"
+              if [ -n "$code" ] && [ "$code" != "000" ]; then
+                echo "Frontend is up (HTTP $code) ✅"
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "Frontend did not become ready in time. Logs:"
+            docker logs --tail=200 brainboost-front || true
+            exit 1
+          '

@@ -1,264 +1,232 @@
+// app/login/page.tsx
 'use client';
 
-import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
-import axios from 'axios';
+import { useState } from 'react';
+import http, { ME_URL } from '@/lib/http';
 
 export default function LoginPage() {
-    const { login } = useAuth();
-    const router = useRouter();
-    const [error, setError] = useState<string | null>(null);
-    const [showResetModal, setShowResetModal] = useState(false);
-    const [resetEmail, setResetEmail] = useState('');
-    const [resetMessage, setResetMessage] = useState<string | null>(null);
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { login } = useAuth();
+  const router = useRouter();
 
-    // Создаем axios instance с interceptor
-    const axiosInstance = axios.create({
-        baseURL: "http://172.17.10.22:8000/",
-        headers: {
-            "Content-Type": "application/json",
-        },
-    });
+  const [error, setError] = useState<string | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-    axiosInstance.interceptors.request.use(
-        (config) => {
-            const access = localStorage.getItem("access");
-            if (access) {
-                config.headers["Authorization"] = `Bearer ${access}`;
-            }
-            return config;
-        },
-        (error) => Promise.reject(error)
-    );
+  const [submitting, setSubmitting] = useState(false);
+  const [showPass, setShowPass] = useState(false);
+  const [remember, setRemember] = useState(true);
 
-    axiosInstance.interceptors.response.use(
-        (response) => response,
-        async (error) => {
-            const originalRequest = error.config;
-            if (
-                error.response?.status === 401 &&
-                !originalRequest._retry &&
-                localStorage.getItem("refresh")
-            ) {
-                originalRequest._retry = true;
-                try {
-                    const res = await axios.post("http://172.17.10.22:8000/accounts/api/token/refresh/", {
-                        refresh: localStorage.getItem("refresh"),
-                    });
-                    localStorage.setItem("access", res.data.access);
-                    axiosInstance.defaults.headers.common["Authorization"] = `Bearer ${res.data.access}`;
-                    return axiosInstance(originalRequest);
-                } catch (err) {
-                    localStorage.clear();
-                    window.location.href = "/login";
-                    return Promise.reject(err);
-                }
-            }
-            return Promise.reject(error);
-        }
-    );
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const formData = new FormData(e.currentTarget);
-        const username = formData.get('username') as string;
-        const password = formData.get('password') as string;
+    const formData = new FormData(e.currentTarget);
+    const username = String(formData.get('username') || '').trim();
+    const password = String(formData.get('password') || '');
 
-        try {
-            const res = await axiosInstance.post('/accounts/api/login/', {
-                username,
-                password,
-            });
+    try {
+      await login(username, password, remember);
+      // швидка перевірка
+      await http.get(ME_URL).catch(() => {});
+      router.push('/profile');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ||
+        err?.response?.data?.error ||
+        'Невірний логін або пароль.';
+      setError(String(msg));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-            const data = res.data;
-            console.log("✅ Ответ при логине:", data);
+  const handleGoogleLogin = () => {
+    // якщо маєш бек-енд endpoint — заміни на нього:
+    // window.location.href = `${process.env.NEXT_PUBLIC_API_BASE}/accounts/google/login/`;
+    alert('Google Sign-In буде додано після узгодження OAuth.'); // тимчасово
+  };
 
-            localStorage.setItem('access', data.access);
-            localStorage.setItem('refresh', data.refresh);
+  const handleReset = async () => {
+    try {
+      // Підлаштуй URL під свій бекенд reset
+      const res = await http.post('/accounts/reset-password/', { email: resetEmail });
+      if (res.status === 200) {
+        setShowResetModal(false);
+        setShowSuccessModal(true);
+        setResetMessage(null);
+      } else {
+        setResetMessage(res.data?.error || 'Помилка скидання пароля.');
+      }
+    } catch {
+      setResetMessage('Серверна помилка.');
+    }
+  };
 
-            const profileRes = await axiosInstance.get('/accounts/api/profile/');
-            const profileData = profileRes.data;
+  return (
+    <div className="flex h-screen overflow-hidden relative">
+      {/* Ліва колонка */}
+      <div className="w-full md:w-1/2 flex flex-col px-8 sm:px-12 lg:px-16 py-10">
+        <Link href="/" className="text-2xl font-extrabold text-blue-700 hover:underline mb-10">
+          BrainBoost
+        </Link>
 
+        <div className="max-w-md">
+          <h1 className="text-4xl font-extrabold text-[#0B1120] mb-8">Вхід</h1>
 
-            localStorage.setItem('userId', profileData.id);
-            localStorage.setItem('username', profileData.username);
-            localStorage.setItem('isAdmin', profileData.is_admin);
-
-            login(data.access);
-
-            router.push('/profile');
-        } catch (err) {
-            console.error("❌ Ошибка при логине:", err);
-            setError('Невірний e-mail або пароль.');
-        }
-    };
-
-    const handleGoogleLogin = async () => {
-        console.log("🔑 Попытка входа через Google");
-        await signIn("google");
-        console.log(Credential)
-    };
-
-
-    const handleReset = async () => {
-        try {
-            const res = await axios.post('http://172.17.10.22:8000/accounts/reset-password/', {
-                email: resetEmail,
-            });
-
-            if (res.status === 200) {
-                setShowResetModal(false);
-                setShowSuccessModal(true);
-            } else {
-                setResetMessage(res.data.error || 'Помилка скидання пароля.');
-            }
-        } catch (err) {
-            setResetMessage('Серверна помилка.');
-        }
-    };
-
-    return (
-        <div className="flex h-screen overflow-hidden relative">
-            <div className="w-full md:w-1/2 flex flex-col px-16 py-12">
-                <Link href="/" className="text-2xl font-extrabold text-blue-700 hover:underline mb-10">
-                    BrainBoost
-                </Link>
-
-                <div>
-                    <h1 className="text-4xl font-extrabold text-[#0B1120] mb-10">Вхід</h1>
-
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div>
-                            <label htmlFor="username" className="text-md text-gray-700 mb-1 block">E-mail</label>
-                            <input
-                                name="username"
-                                type="username"
-                                required
-                                className="w-full border border-gray-300 rounded-xl p-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label htmlFor="password" className="text-md text-gray-700 mb-1 block">Пароль</label>
-                            <input
-                                name="password"
-                                type="password"
-                                required
-                                className="w-full border border-gray-300 rounded-xl p-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            className="w-full bg-blue-700 hover:bg-blue-800 text-white text-lg py-4 rounded-xl font-semibold transition"
-                        >
-                            Вхід
-                        </button>
-
-                        {error && <p className="text-red-500 text-sm">{error}</p>}
-                    </form>
-
-                    <div className="my-6 text-center text-gray-500 text-md">або</div>
-
-                    <button
-                        onClick={handleGoogleLogin}
-                        type="button"
-                        className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition"
-                    >
-                        <img src="/images/google-login.png" alt="Google" className="w-5 h-5" />
-                        <span className="text-md font-medium">Sign in with Google</span>
-                    </button>
-
-                    <div className="text-center text-sm text-gray-500 mt-6">
-                        <button
-                            onClick={() => setShowResetModal(true)}
-                            className="hover:underline"
-                        >
-                            Не памʼятаю пароль
-                        </button>
-                    </div>
-
-                    <div className="text-center text-sm text-gray-500 mt-2">
-                        Немає акаунту?{' '}
-                        <a href="/register" className="text-gray-600 hover:underline">Зареєструватися</a>
-                    </div>
-                </div>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div>
+              <label htmlFor="username" className="text-sm text-gray-700 mb-1 block">
+                E-mail або логін
+              </label>
+              <input
+                name="username"
+                type="text"
+                required
+                autoComplete="username"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
             </div>
 
-            {/* Правая часть */}
-            <div className="hidden md:block w-1/2 bg-blue-900">
-                <img
-                    src="/images/dog-login.png"
-                    alt="Dog with laptop"
-                    className="w-full h-full object-cover"
+            <div>
+              <label htmlFor="password" className="text-sm text-gray-700 mb-1 block">
+                Пароль
+              </label>
+              <div className="relative">
+                <input
+                  name="password"
+                  type={showPass ? 'text' : 'password'}
+                  required
+                  autoComplete="current-password"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 pr-12 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPass((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-600 hover:text-black"
+                >
+                  {showPass ? 'Сховати' : 'Показати'}
+                </button>
+              </div>
             </div>
 
-            {/* Reset Modal */}
-            {showResetModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/10">
-                    <div className="bg-white rounded-2xl shadow-xl w-[90%] max-w-md p-8 relative">
-                        <button
-                            onClick={() => setShowResetModal(false)}
-                            className="absolute top-4 right-4 text-2xl text-gray-500 hover:text-black"
-                        >
-                            ×
-                        </button>
+            <div className="flex items-center justify-between">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember((e.target as HTMLInputElement).checked)}
+                  className="accent-blue-600"
+                />
+                Запамʼятати мене
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowResetModal(true)}
+                className="text-sm text-gray-600 hover:underline"
+              >
+                Забув пароль?
+              </button>
+            </div>
 
-                        <h2 className="text-xl font-semibold text-center text-gray-900 mb-6">
-                            Введіть електронну адресу<br /> або номер телефону
-                        </h2>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-lg py-3.5 rounded-xl font-semibold transition"
+            >
+              {submitting ? 'Входимо…' : 'Вхід'}
+            </button>
 
-                        <input
-                            type="email"
-                            placeholder="Ваша електронна пошта"
-                            value={resetEmail}
-                            onChange={(e) => setResetEmail(e.target.value)}
-                            className="w-full border border-gray-300 rounded-xl p-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-                        />
+            {error && <p className="text-red-500 text-sm">{error}</p>}
+          </form>
 
-                        {resetMessage && (
-                            <p className="text-center text-sm text-red-500 mb-4">{resetMessage}</p>
-                        )}
+          <div className="my-6 text-center text-gray-500 text-sm">або</div>
 
-                        <button
-                            onClick={handleReset}
-                            className="w-full border border-blue-500 text-blue-700 text-lg py-3 rounded-xl font-semibold hover:bg-blue-50 transition"
-                        >
-                            Далі
-                        </button>
-                    </div>
-                </div>
-            )}
+          <button
+            onClick={handleGoogleLogin}
+            type="button"
+            className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition"
+          >
+            <img src="/images/google-login.png" alt="Google" className="w-5 h-5" />
+            <span className="text-sm font-medium">Увійти через Google</span>
+          </button>
 
-            {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-white/10">
-                    <div className="bg-white rounded-2xl shadow-xl max-w-md p-8 relative text-center border border-blue-400"
-                        style={{ width: '694px', height: '207px' }}>
-                        <button
-                            onClick={() => setShowSuccessModal(false)}
-                            className="absolute top-4 right-4 text-2xl text-gray-500 hover:text-black"
-                        >
-                            ×
-                        </button>
-
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 w-16 h-16 rounded-full overflow-hidden border-4 border-white shadow-md bg-white">
-                            <img src="/images/avatar.png" alt="Avatar" className="w-full h-full object-cover" />
-                        </div>
-
-                        <h2 className="text-xl font-bold text-gray-900 mt-4 mb-4" style={{ fontSize: '30px' }}>Дякуємо</h2>
-                        <p className="text-md font-semibold text-gray-800 mb-1">
-                            Лист для скидання пароля вже в дорозі.
-                        </p>
-                        <p className="text-md text-gray-700">Зазирніть у вашу електронну скриньку</p>
-                    </div>
-                </div>
-            )}
+          <div className="text-center text-sm text-gray-500 mt-6">
+            Немає акаунту?{' '}
+            <Link href="/register" className="text-gray-700 font-semibold hover:underline">
+              Зареєструватися
+            </Link>
+          </div>
         </div>
-    );
+      </div>
+
+      {/* Права колонка з ілюстрацією */}
+      <div className="hidden md:block w-1/2 bg-blue-900">
+        <img src="/images/dog-login.png" alt="Dog with laptop" className="w-full h-full object-cover" />
+      </div>
+
+      {/* Reset Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/20">
+          <div className="bg-white rounded-2xl shadow-xl w-[90%] max-w-md p-8 relative">
+            <button
+              onClick={() => setShowResetModal(false)}
+              className="absolute top-4 right-4 text-2xl text-gray-500 hover:text-black"
+            >
+              ×
+            </button>
+
+            <h2 className="text-lg font-semibold text-center text-gray-900 mb-4">Скидання пароля</h2>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Вкажіть e-mail, на який надіслати посилання для відновлення.
+            </p>
+
+            <input
+              type="email"
+              placeholder="email@example.com"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+            />
+
+            {resetMessage && <p className="text-center text-sm text-red-500 mb-3">{resetMessage}</p>}
+
+            <button
+              onClick={handleReset}
+              className="w-full border border-blue-500 text-blue-700 text-base py-2.5 rounded-xl font-semibold hover:bg-blue-50 transition"
+            >
+              Надіслати
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-black/20">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md p-8 relative text-center border border-blue-100 w-[90%]">
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              className="absolute top-4 right-4 text-2xl text-gray-500 hover:text-black"
+            >
+              ×
+            </button>
+
+            <div className="mx-auto mb-3 w-16 h-16 rounded-full overflow-hidden border-4 border-white shadow-md bg-white -mt-12">
+              <img src="/images/avatar.png" alt="Avatar" className="w-full h-full object-cover" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Дякуємо</h2>
+            <p className="text-sm font-medium text-gray-800 mb-1">Лист для скидання пароля вже в дорозі.</p>
+            <p className="text-sm text-gray-600">Перевірте вашу пошту.</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

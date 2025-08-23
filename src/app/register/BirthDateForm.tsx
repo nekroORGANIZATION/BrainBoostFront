@@ -1,137 +1,199 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { register } from '@/services/AuthService';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { RegisterFormData } from './page';
+import { useAuth } from '@/context/AuthContext';
+import { registerUser } from '@/lib/api';
 
-interface BirthDateFormProps {
-  updateData: (data: { birthDate: string }) => void;
-  values: {
-    role: string;
-    name: string;
-    email: string;
-    password: string;
-    birthDate?: string;
-  };
-  onBack?: () => void;
+type Props = {
+  onBack: () => void;
+  updateData: (patch: Partial<RegisterFormData>) => void;
+  values: RegisterFormData;
+};
+
+function pad2(n: number | string) {
+  return String(n).padStart(2, '0');
 }
 
-export default function BirthDateForm({ updateData, values }: BirthDateFormProps) {
-  // Дефолтная дата
+export default function BirthDateForm({ onBack, updateData, values }: Props) {
+  // дефолт: 31.12.2005
   const [day, setDay] = useState('31');
   const [month, setMonth] = useState('12');
   const [year, setYear] = useState('2005');
+
   const [age, setAge] = useState<number | null>(null);
   const [formattedDate, setFormattedDate] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const months = [
-    'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-    'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'
-  ];
+  const router = useRouter();
+  const { login } = useAuth();
 
-  // Считаем возраст и форматируем дату
+  const monthsUA = useMemo(
+    () => [
+      'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+      'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня',
+    ],
+    []
+  );
+
+  // підрахунок віку + запис у formData у форматі ISO (YYYY-MM-DD)
   useEffect(() => {
-    if (day && month && year) {
-      const birthDate = new Date(Number(year), Number(month) - 1, Number(day));
-      const today = new Date();
-      let userAge = today.getFullYear() - birthDate.getFullYear();
-      const m = today.getMonth() - birthDate.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        userAge--;
-      }
-      setAge(userAge);
-      setFormattedDate(`${day} ${months[Number(month) - 1]} ${year} р.`);
-      updateData({ birthDate: `${year}-${month}-${day}` });
+    const d = Number(day), m = Number(month), y = Number(year);
+    if (!d || !m || !y) return;
+
+    const birth = new Date(y, m - 1, d);
+    if (Number.isNaN(birth.getTime())) return;
+
+    // якщо дата некоректна (31.04 тощо) — не оновлюємо
+    if (birth.getDate() !== d || birth.getMonth() !== m - 1 || birth.getFullYear() !== y) {
+      return;
     }
-  }, [day, month, year]);
+
+    const today = new Date();
+    let a = today.getFullYear() - y;
+    const mdiff = today.getMonth() - (m - 1);
+    if (mdiff < 0 || (mdiff === 0 && today.getDate() < d)) a -= 1;
+
+    setAge(a);
+    setFormattedDate(`${d} ${monthsUA[m - 1]} ${y} р.`);
+    updateData({ birthDate: `${y}-${pad2(m)}-${pad2(d)}` });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day, month, year, monthsUA]);
+
+  const validateAll = () => {
+    if (!values.role) return 'Оберіть роль.';
+    if (!values.name.trim()) return 'Введіть ім’я.';
+    const okEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim());
+    if (!okEmail) return 'Некоректний e-mail.';
+    if ((values.password || '').length < 6) return 'Пароль має містити мінімум 6 символів.';
+    if (!values.birthDate) return 'Вкажіть дату народження.';
+    if (age === null || age < 10) return 'Мінімальний вік — 10 років.';
+    return null;
+  };
 
   const handleSubmit = async () => {
+    const msg = validateAll();
+    if (msg) { setError(msg); return; }
+
+    setError(null);
+    setBusy(true);
     try {
-      await register(values.role, values.name, values.email, values.password, values.birthDate ?? '');
-      alert('Реєстрація успішна!');
-    } catch (err) {
-      console.error(err);
-      alert('Помилка реєстрації');
+      const res = await registerUser(
+        values.role as 'student' | 'teacher',
+        values.name,
+        values.email,
+        values.password,
+        values.birthDate // у форматі YYYY-MM-DD
+      );
+
+      // якщо бек повернув токени — логінимо одразу
+      if (res?.access && res?.refresh) {
+        login(res.access, res.refresh);
+        router.push('/profile');
+        return;
+      }
+
+      // інакше ведемо на логін із позначкою успіху
+      router.push('/login?registered=1');
+    } catch (e: any) {
+      // намагаємось витягнути меседж із axios response
+      const msg =
+        e?.response?.data?.detail ||
+        e?.response?.data?.error ||
+        (typeof e?.response?.data === 'string' ? e.response.data : null) ||
+        e?.message ||
+        'Помилка реєстрації.';
+      setError(String(msg));
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center h-screen bg-white">
-        {/* Лого */}
-        <div className="absolute top-6 left-6 text-lg font-bold text-blue-900">LOGO</div>
+    <div className="flex items-center justify-center h-screen bg-white relative overflow-hidden">
+      <div className="absolute top-6 left-6 text-lg font-bold text-blue-900">LOGO</div>
 
-        {/* Синие фигуры */}
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-700 clip-triangle"></div>
-        <div className="absolute top-1/2 right-0 w-[350px] h-[300px] bg-blue-700 clip-right-triangle transform -translate-y-1/2"></div>
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-700" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)' }} />
+      <div
+        className="absolute top-1/2 right-0 w-[350px] h-[300px] bg-blue-700 -translate-y-1/2"
+        style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }}
+      />
 
-        <div
-            className="bg-white flex flex-col items-center justify-between"
-            style={{ width: '652px', height: '450px' }}
-        >
-            {/* Заголовок */}
-            <h2 className="text-2xl font-bold mt-10 mb-6 text-center" style={{ fontSize: '34px' }}>Напиши свій день народження</h2>
+      <div
+        className="bg-white flex flex-col items-center justify-between rounded-2xl border border-gray-100 shadow md:shadow-none"
+        style={{ width: '652px', minHeight: '450px' }}
+      >
+        <h2 className="text-3xl font-bold mt-10 mb-6 text-center">Напиши свій день народження</h2>
 
-            {/* Поля даты */}
-            <div className="flex gap-14 mb-6">
-            {/* День */}
-            <div className="flex flex-col items-center">
-                <div className="w-20 border-t border-gray-400 mb-2"></div>
-                <input
-                type="string"
-                value={day}
-                onChange={(e) => setDay(e.target.value)}
-                className="text-center text-xl w-20 focus:outline-none"
-                />
-                <div className="w-20 border-b border-gray-400 mt-2"></div>
-            </div>
+        <div className="flex gap-10 mb-6">
+          {/* День */}
+          <div className="flex flex-col items-center">
+            <div className="w-20 border-t border-gray-400 mb-2" />
+            <input
+              type="number"
+              min={1}
+              max={31}
+              value={day}
+              onChange={(e) => setDay(e.target.value)}
+              className="text-center text-xl w-20 focus:outline-none"
+            />
+            <div className="w-20 border-b border-gray-400 mt-2" />
+          </div>
 
-            {/* Месяц */}
-            <div className="flex flex-col items-center">
-                <div className="w-20 border-t border-gray-400 mb-2"></div>
-                <input
-                type="string"
-                value={month}
-                onChange={(e) => setMonth(e.target.value)}
-                className="text-center text-xl w-20 focus:outline-none"
-                />
-                <div className="w-20 border-b border-gray-400 mt-2"></div>
-            </div>
+          {/* Місяць */}
+          <div className="flex flex-col items-center">
+            <div className="w-20 border-t border-gray-400 mb-2" />
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="text-center text-xl w-20 focus:outline-none"
+            />
+            <div className="w-20 border-b border-gray-400 mt-2" />
+          </div>
 
-            {/* Год */}
-            <div className="flex flex-col items-center">
-                <div className="w-24 border-t border-gray-400 mb-2"></div>
-                <input
-                type="string"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                className="text-center text-xl w-24 focus:outline-none"
-                />
-                <div className="w-24 border-b border-gray-400 mt-2"></div>
-            </div>
-            </div>
+          {/* Рік */}
+          <div className="flex flex-col items-center">
+            <div className="w-24 border-t border-gray-400 mb-2" />
+            <input
+              type="number"
+              min={1900}
+              max={new Date().getFullYear()}
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="text-center text-xl w-24 focus:outline-none"
+            />
+            <div className="w-24 border-b border-gray-400 mt-2" />
+          </div>
+        </div>
 
-            {/* Форматированная дата + возраст */}
-            <div className="flex justify-between items-center border rounded px-6 py-3 mb-6 w-[480px] text-gray-700 text-lg" style={{padding: '20px 20px'}}>
-            <span>{formattedDate}</span>
-            <span>{age !== null ? `${age} років` : ''}</span>
-            </div>
+        <div className="flex justify-between items-center border rounded px-6 py-3 mb-4 w-[480px] text-gray-700 text-lg">
+          <span>{formattedDate}</span>
+          <span>{age !== null ? `${age} років` : ''}</span>
+        </div>
 
-            {/* Кнопка */}
-            <button
+        {error && <div className="text-red-600 text-sm font-medium mb-2 px-4 text-center">{error}</div>}
+
+        <div className="flex gap-3 mb-8">
+          <button
+            onClick={onBack}
+            className="border border-gray-300 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-50"
+          >
+            Назад
+          </button>
+          <button
             onClick={handleSubmit}
-            className="bg-blue-700 text-white w-[350px] py-3 rounded-lg text-lg hover:bg-blue-800 transition mb-10"
-            >
-            Реєстрація
-            </button>
+            disabled={busy}
+            className="bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white px-10 py-3 rounded-lg"
+          >
+            {busy ? 'Реєструємо…' : 'Реєстрація'}
+          </button>
         </div>
-        {/* CSS для фигур */}
-       <style jsx>{`
-            .clip-triangle {
-                clip-path: polygon(0 100%, 0 0, 100% 100%);
-            }
-            .clip-right-triangle {
-                clip-path: polygon(0 0, 100% 50%, 0 100%);
-            }
-        `}</style>
-        </div>
-    );
+      </div>
+    </div>
+  );
 }

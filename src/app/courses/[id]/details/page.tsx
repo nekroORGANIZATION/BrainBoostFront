@@ -1,27 +1,27 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import http from '@/lib/http';
+import { mediaUrl } from '@/lib/api';
+import { API_BASE } from '@/lib/http';
 
 type Course = {
   id: number;
+  slug?: string;
   title: string;
-  description: string;
-  author_username: string;
-  language: string;
-  topic?: string;
-  price: number | string;
-  rating: number | string;
+  description?: string;
   image?: string | null;
+  author: number | { id: number; username: string };
+  author_username?: string;
+  language?: string;
+  topic?: string;
+  price?: number | string | null;
+  rating?: number | string | null;
 };
 
-type User = {
-  id: number | null;
-  isAdmin: boolean;
-  username: string | null;
-};
+type Me = { id: number; username: string; is_superuser: boolean; is_teacher: boolean };
 
 type Comment = {
   id: number;
@@ -30,227 +30,175 @@ type Comment = {
   created_at: string;
 };
 
-export default function CourseDetail() {
+export default function CourseDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const courseId = params?.id;
+  const raw = Array.isArray(params?.id) ? params?.id[0] : String(params?.id || '');
+  const isNumeric = /^\d+$/.test(raw);
 
+  const [me, setMe] = useState<Me | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
-  const [user, setUser] = useState<User>({
-    id: null,
-    isAdmin: false,
-    username: null,
-  });
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   const [comments, setComments] = useState<Comment[]>([]);
   const [loadingComments, setLoadingComments] = useState(true);
-  
   const [commentText, setCommentText] = useState('');
-  const [editCommentId, setEditCommentId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<number | null>(null);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-
-  // Отримуємо користувача через API
-  const fetchUser = async () => {
-    if (!token) return;
+  // ----- helpers
+  async function loadCourseByIdOrSlug(idOrSlug: string) {
+    // 1) /courses/<id>/
     try {
-      const res = await axios.get('http://172.17.10.22:8000/courses/all/users/me/', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setUser({
-        id: res.data.id,
-        isAdmin: res.data.is_admin,
-        username: res.data.username,
-      });
-    } catch (err) {
-      console.error('Помилка отримання користувача:', err);
-      setUser({ id: null, isAdmin: false, username: null });
+      const r = await http.get(`/courses/${idOrSlug}/`);
+      return r.data as Course;
+    } catch (e: any) {
+      // 2) /courses/all/<id>/
+      try {
+        const r2 = await http.get(`/courses/all/${idOrSlug}/`);
+        return r2.data as Course;
+      } catch {
+        // 3) by-slug ендпоїнт (якщо додано)
+        try {
+          const r3 = await fetch(`${API_BASE}/courses/by-slug/${encodeURIComponent(idOrSlug)}/`, { cache: 'no-store' });
+          if (r3.ok) return (await r3.json()) as Course;
+        } catch {}
+
+        // 4) фолбек: тягнемо список і шукаємо по slug
+        const r4 = await fetch(`${API_BASE}/courses/?page_size=200`, { cache: 'no-store' });
+        const j = await r4.json();
+        const arr: Course[] = Array.isArray(j) ? j : (j?.results || []);
+        const found = arr.find((c) => c.slug === idOrSlug);
+        if (!found) throw new Error('Курс не знайдено.');
+        return found;
+      }
     }
-  };
+  }
 
-  useEffect(() => {
-    if (!courseId) return;
-
-    setLoading(true);
-
-    Promise.all([
-      axios.get(`http://127.0.0.1:8000/courses/${courseId}/`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-      fetchUser(),
-    ])
-      .then(([courseRes]) => {
-        setCourse(courseRes.data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Не вдалося завантажити курс');
-        setLoading(false);
-      });
-  }, [courseId, token]);
-
-  const loadComments = () => {
-    if (!courseId) return;
+  async function loadComments(courseId: number) {
     setLoadingComments(true);
-    axios
-      .get(`http://127.0.0.1:8000/courses/${courseId}/comments/`)
-      .then(res => {
-        setComments(Array.isArray(res.data.results) ? res.data.results : []);
-      })
-      .catch(err => {
-        console.error('Помилка завантаження коментарів:', err);
-        setComments([]);
-      })
-      .finally(() => setLoadingComments(false));
-  };
+    try {
+      const r = await http.get(`/courses/${courseId}/comments/`);
+      const list = Array.isArray(r.data?.results) ? r.data.results : r.data || [];
+      setComments(list);
+    } catch {
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
+  }
 
+  function isOwner(c: Course): boolean {
+    const authorId = typeof c.author === 'number' ? c.author : c.author?.id;
+    return !!me && !!authorId && me.id === authorId;
+  }
+
+  // ----- load me + course
   useEffect(() => {
-    loadComments();
-  }, [courseId]);
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setErr(null);
+      try {
+        // профіль
+        try {
+          const meRes = await http.get('/accounts/api/profile/');
+          if (!cancelled) setMe(meRes.data as Me);
+        } catch {
+          if (!cancelled) setMe(null);
+        }
 
-  // Перевірка прав на редагування курсу
-  const canEditCourse =
-    user.isAdmin ||
-    (user.username?.trim().toLowerCase() === course?.author_username?.trim().toLowerCase());
+        // курс
+        const data = await loadCourseByIdOrSlug(raw);
+        const normalized: Course = {
+          ...data,
+          image: data.image ? mediaUrl(data.image) : null,
+        };
+        if (!cancelled) {
+          setCourse(normalized);
+          // коментарі
+          await loadComments(normalized.id);
+        }
+      } catch (e: any) {
+        if (!cancelled) setErr(e?.message || 'Не вдалося завантажити курс');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [raw]);
 
-  // Перевірка прав на редагування/видалення коментаря
-  const canModifyComment = (comment: Comment) => {
-    return (
-      user.isAdmin ||
-      user.username?.trim().toLowerCase() === comment.author_username.trim().toLowerCase()
-    );
-  };
-
-  // Додавання або оновлення коментаря
-  const handleSubmitComment = async () => {
+  // ----- comments actions
+  async function saveComment() {
+    if (!course) return;
     if (!commentText.trim()) return alert('Введіть текст коментаря');
-    if (!token) return router.push('/login');
 
     try {
-      if (editCommentId) {
-        // Оновлення коментаря
-        await axios.put(
-          `http://127.0.0.1:8000/courses/${courseId}/comments/${editCommentId}/`,
-          { text: commentText },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setEditCommentId(null);
+      if (editId) {
+        await http.put(`/courses/${course.id}/comments/${editId}/`, { text: commentText });
+        setEditId(null);
       } else {
-        // Додавання нового коментаря
-        await axios.post(
-          `http://127.0.0.1:8000/courses/${courseId}/comments/`,
-          { text: commentText },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        await http.post(`/courses/${course.id}/comments/`, { text: commentText });
       }
       setCommentText('');
-      loadComments();
+      await loadComments(course.id);
     } catch {
       alert('Помилка при збереженні коментаря');
     }
-  };
+  }
 
-  // Почати редагування коментаря
-  const startEditComment = (comment: Comment) => {
-    setEditCommentId(comment.id);
-    setCommentText(comment.text);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Прокрутка до форми
-  };
-
-  // Скасувати редагування коментаря
-  const cancelEdit = () => {
-    setEditCommentId(null);
-    setCommentText('');
-  };
-
-  // Видалити коментар
-  const handleDeleteComment = async (commentId: number) => {
-    if (!token) return router.push('/login');
-    if (!confirm('Ви впевнені, що хочете видалити цей коментар?')) return;
-
+  async function deleteComment(cid: number) {
+    if (!course) return;
+    if (!confirm('Видалити коментар?')) return;
     try {
-      await axios.delete(
-        `http://127.0.0.1:8000/courses/${courseId}/comments/${commentId}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      loadComments();
+      await http.delete(`/courses/${course.id}/comments/${cid}/`);
+      await loadComments(course.id);
     } catch {
       alert('Помилка при видаленні коментаря');
     }
-  };
+  }
 
-  if (loading) return <p style={{ textAlign: 'center', marginTop: '2rem' }}>Завантаження...</p>;
-  if (error) return <p style={{ textAlign: 'center', marginTop: '2rem', color: 'red' }}>{error}</p>;
+  const canEditCourse = useMemo(() => {
+    if (!course) return false;
+    return !!me && (me.is_superuser || isOwner(course));
+  }, [me, course]);
+
+  if (loading) return <p style={{ textAlign: 'center', marginTop: '2rem' }}>Завантаження…</p>;
+  if (err) return <p style={{ textAlign: 'center', marginTop: '2rem', color: 'red' }}>{err}</p>;
   if (!course) return null;
-
-  const canEdit =
-    user.isAdmin ||
-    (user.username?.trim().toLowerCase() === course.author_username?.trim().toLowerCase());
-
-  const handleCheckoutClick = (e: React.MouseEvent) => {
-    if (!token) {
-      e.preventDefault();
-      router.push('/login');
-    }
-  };
 
   return (
     <>
       <main className="container">
         <h1 className="title">{course.title}</h1>
 
-        {course.image && (
+        {!!course.image && (
           <div className="image-wrapper">
-            <img src={course.image} alt={course.title} />
+            <img src={String(course.image)} alt={course.title} />
           </div>
         )}
 
         <div className="info">
           <p className="description">{course.description}</p>
-
           <ul className="details-list">
-            <li><strong>Автор:</strong> {course.author_username || 'Невідомий'}</li>
-            <li><strong>Мова:</strong> {course.language}</li>
+            <li><strong>Автор:</strong> {course.author_username || (typeof course.author === 'object' ? course.author?.username : '—')}</li>
+            {course.language && <li><strong>Мова:</strong> {course.language}</li>}
             {course.topic && <li><strong>Тема:</strong> {course.topic}</li>}
-            <li><strong>Ціна:</strong> ${Number(course.price).toFixed(2)}</li>
-            <li><strong>Рейтинг:</strong> {Number(course.rating).toFixed(2)}</li>
+            {course.price != null && <li><strong>Ціна:</strong> ${Number(course.price).toFixed(2)}</li>}
+            {course.rating != null && <li><strong>Рейтинг:</strong> {Number(course.rating).toFixed(2)}</li>}
           </ul>
 
           <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {canEdit && (
+            {canEditCourse && (
               <>
-                <Link
-                  href={`/courses/${course.id}/edit`}
-                  className="btn btn-edit-course"
-                >
-                  ✏️ Редагувати
-                </Link>
-                <Link
-                  href={`/courses/${course.id}/delete`}
-                  className="btn btn-delete-course"
-                >
-                  🗑️ Видалити
-                </Link>
-                <Link
-                  href="/lessons/create"
-                  className="btn btn-add-lesson"
-                >
-                  + Додати урок
-                </Link>
+                <Link href={`/courses/${course.id}/edit`} className="btn btn-edit-course">✏️ Редагувати</Link>
+                <Link href={`/courses/${course.id}/delete`} className="btn btn-delete-course">🗑️ Видалити</Link>
+                <Link href="/lessons/create" className="btn btn-add-lesson">+ Додати урок</Link>
               </>
             )}
-            <Link
-              href={`/checkout/${course.id}`}
-              onClick={handleCheckoutClick}
-              className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
+            <Link href={`/checkout/${course.id}`} className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
               💳 Перейти до оформлення
             </Link>
           </div>
@@ -259,75 +207,53 @@ export default function CourseDetail() {
         <section className="comments-section">
           <h2>Коментарі</h2>
 
-          {user.id ? (
+          {me ? (
             <div className="comment-form">
               <textarea
                 value={commentText}
-                onChange={e => setCommentText(e.target.value)}
+                onChange={(e) => setCommentText(e.target.value)}
                 rows={4}
                 placeholder="Напишіть коментар"
               />
               <div style={{ marginTop: '0.5rem' }}>
-                <button
-                  onClick={handleSubmitComment}
-                  className="btn-submit"
-                >
-                  {editCommentId ? 'Оновити' : 'Додати'}
+                <button onClick={saveComment} className="btn-submit">
+                  {editId ? 'Оновити' : 'Додати'}
                 </button>
-                {editCommentId && (
-                  <button onClick={cancelEdit} className="btn-cancel">
+                {editId && (
+                  <button onClick={() => { setEditId(null); setCommentText(''); }} className="btn-cancel">
                     Скасувати
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <p>
-              <Link href="/login" className="login-link">
-                Увійдіть
-              </Link>{' '}
-              щоб додати коментар.
-            </p>
+            <p>Щоб додати коментар — <Link href="/login" className="login-link">Увійдіть</Link>.</p>
           )}
 
           {loadingComments ? (
-            <p>Завантаження коментарів...</p>
+            <p>Завантаження коментарів…</p>
           ) : comments.length === 0 ? (
-            <p>Коментарі відсутні.</p>
+            <p>Коментарів поки немає.</p>
           ) : (
             <ul className="comments-list">
-              {comments.map(comment => (
-                <li key={comment.id} className="comment-item">
-                  <div className="comment-header">
-                    <strong>{comment.author_username}</strong>{' '}
-                    <span className="comment-date">
-                      {new Date(comment.created_at).toLocaleString()}
-                    </span>
-                  </div>
-                  <p className="comment-content">{comment.text}</p>
-                  <br/>
-                  {canModifyComment(comment) && (
-                    <div className="comment-actions">
-                      <button
-                        onClick={() => startEditComment(comment)}
-                        className="btn-edit"
-                        aria-label="Редагувати коментар"
-                        type="button"
-                      >
-                        ✏️ Редагувати
-                      </button>
-                      <button
-                        onClick={() => handleDeleteComment(comment.id)}
-                        className="btn-delete"
-                        aria-label="Видалити коментар"
-                        type="button"
-                      >
-                        🗑️ Видалити
-                      </button>
+              {comments.map((c) => {
+                const can = !!me && (me.is_superuser || me.username?.toLowerCase() === c.author_username.toLowerCase());
+                return (
+                  <li key={c.id} className="comment-item">
+                    <div className="comment-header">
+                      <strong>{c.author_username}</strong>
+                      <span className="comment-date">{new Date(c.created_at).toLocaleString()}</span>
                     </div>
-                  )}
-                </li>
-              ))}
+                    <p className="comment-content">{c.text}</p>
+                    {can && (
+                      <div className="comment-actions">
+                        <button className="btn-edit" onClick={() => { setEditId(c.id); setCommentText(c.text); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>✏️ Редагувати</button>
+                        <button className="btn-delete" onClick={() => deleteComment(c.id)}>🗑️ Видалити</button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -335,280 +261,41 @@ export default function CourseDetail() {
 
       <style jsx>{`
         .container {
-          max-width: 800px;
+          max-width: 860px;
           margin: 3rem auto;
           padding: 2rem 2.5rem;
           background-color: #f0f4f8;
           border-radius: 20px;
-          box-shadow: 0 8px 20px rgba(100, 100, 150, 0.1),
-            0 4px 10px rgba(100, 100, 150, 0.05);
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-            Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+          box-shadow: 0 8px 20px rgba(100, 100, 150, 0.1), 0 4px 10px rgba(100, 100, 150, 0.05);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
           color: #334155;
         }
-
-        .title {
-          font-size: 2.8rem;
-          font-weight: 700;
-          color: #3b82f6;
-          margin-bottom: 1.5rem;
-          text-align: center;
-          text-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
-        }
-
-        .image-wrapper {
-          width: 100%;
-          max-height: 350px;
-          overflow: hidden;
-          border-radius: 18px;
-          margin-bottom: 2rem;
-          box-shadow: 0 8px 16px rgba(75, 85, 99, 0.15);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          background: white;
-        }
-
-        .image-wrapper img {
-          max-width: 100%;
-          max-height: 100%;
-          object-fit: contain;
-          border-radius: 18px;
-        }
-
-        .info {
-          font-size: 1.1rem;
-          line-height: 1.6;
-        }
-
-        .description {
-          margin-bottom: 2rem;
-          color: #475569;
-        }
-
-        .details-list {
-          list-style: none;
-          padding: 0;
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-          gap: 1rem 2rem;
-          font-weight: 600;
-          color: #334155;
-        }
-
-        .details-list li {
-          background: white;
-          padding: 0.8rem 1.2rem;
-          border-radius: 12px;
-          box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-          transition: box-shadow 0.3s ease;
-        }
-
-        .details-list li:hover {
-          box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
-        }
-
-        /* Коментарі */
-
-        .comments-section {
-          margin-top: 4rem;
-        }
-
-        .comments-section h2 {
-          font-size: 2rem;
-          margin-bottom: 1rem;
-          color: #2563eb;
-          border-bottom: 2px solid #2563eb;
-          padding-bottom: 0.3rem;
-        }
-
-        .comment-form textarea {
-          width: 100%;
-          border-radius: 10px;
-          border: 1px solid #94a3b8;
-          padding: 0.8rem 1rem;
-          font-size: 1rem;
-          resize: vertical;
-          font-family: inherit;
-          color: #334155;
-        }
-
-        .btn-submit,
-        .btn-cancel {
-          padding: 0.5rem 1rem;
-          margin-right: 0.5rem;
-          border-radius: 8px;
-          font-weight: 600;
-          border: none;
-          cursor: pointer;
-          font-size: 1rem;
-          transition: background-color 0.2s ease;
-        }
-
-        .btn-submit {
-          background-color: #2563eb;
-          color: white;
-        }
-        .btn-submit:hover {
-          background-color: #1e40af;
-        }
-
-        .btn-cancel {
-          background-color: #9ca3af;
-          color: white;
-        }
-        .btn-cancel:hover {
-          background-color: #6b7280;
-        }
-
-        .login-link {
-          color: #2563eb;
-          font-weight: 600;
-          text-decoration: underline;
-          cursor: pointer;
-        }
-
-        .comments-list {
-          list-style: none;
-          padding: 0;
-          margin-top: 2rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-
-        .comment-item {
-          position: relative;
-          padding: 1.5rem 1.5rem 1.5rem 1.5rem;
-          background-color: #f8fafc;
-          border-radius: 0.75rem;
-          margin-bottom: 1rem;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-          padding-top: 3.5rem; /* більший верхній відступ — щоб кнопки не перекривали */
-        }
-
-        .comment-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          font-weight: 600;
-          font-size: 0.95rem;
-          color: #334155;
-          margin-bottom: 0.4rem;
-        }
-
-        .comment-date {
-          font-weight: 400;
-          font-size: 0.85rem;
-          color: #94a3b8;
-        }
-
-        .comment-content {
-          font-size: 1rem;
-          color: #1e293b;
-          white-space: pre-wrap;
-        }
-
-        .comment-actions {
-          position: absolute;
-          top: 1rem;
-          right: 1rem;
-          display: flex;
-          gap: 0.5rem;
-          z-index: 10;
-        }
-
-        .btn {
-          display: inline-block;
-          padding: 0.5rem 1.2rem;
-          border-radius: 8px;
-          font-weight: 600;
-          text-decoration: none;
-          transition: background-color 0.2s ease;
-          user-select: none;
-          cursor: pointer;
-          font-size: 1rem;
-        }
-
-        /* Редагування курсу */
-        .btn-edit-course {
-          background-color: #fbbf24;
-          color: #92400e;
-          border: 1.5px solid #fbbf24;
-        }
-        .btn-edit-course:hover {
-          background-color: #f59e0b;
-          color: white;
-          border-color: #d97706;
-        }
-
-        /* Видалення курсу */
-        .btn-delete-course {
-          background-color: #ef4444;
-          color: white;
-          border: 1.5px solid #ef4444;
-        }
-        .btn-delete-course:hover {
-          background-color: #dc2626;
-          border-color: #b91c1c;
-          color: white;
-        }
-
-        /* Додавання уроку */
-        .btn-add-lesson {
-          background-color: #3b82f6;
-          color: white;
-          border: 1.5px solid #3b82f6;
-        }
-        .btn-add-lesson:hover {
-          background-color: #2563eb;
-          border-color: #1d4ed8;
-          color: white;
-        }
-
-        /* Кнопки редагування/видалення коментарів */
-        .btn-edit,
-        .btn-delete {
-          padding: 6px 12px;
-          font-size: 0.9rem;
-          border-radius: 6px;
-          border: 1.5px solid transparent;
-          cursor: pointer;
-          font-weight: 600;
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-          user-select: none;
-          background-color: transparent;
-          color: #334155;
-          border-color: transparent;
-        }
-
-        /* Редагування коментаря */
-        .btn-edit {
-          background-color: #fbbf24;
-          color: #92400e;
-          border-color: #fbbf24;
-        }
-        .btn-edit:hover {
-          background-color: #f59e0b;
-          color: white;
-          border-color: #d97706;
-        }
-
-        /* Видалення коментаря */
-        .btn-delete {
-          background-color: #ef4444;
-          color: white;
-          border-color: #ef4444;
-        }
-        .btn-delete:hover {
-          background-color: #dc2626;
-          border-color: #b91c1c;
-          color: white;
-        }
-
+        .title { font-size: 2.8rem; font-weight: 700; color: #3b82f6; margin-bottom: 1.5rem; text-align: center; }
+        .image-wrapper { width: 100%; max-height: 360px; overflow: hidden; border-radius: 18px; margin-bottom: 2rem; background: white; display:flex; align-items:center; justify-content:center; }
+        .image-wrapper img { max-width:100%; max-height:100%; object-fit:contain; }
+        .info { font-size: 1.1rem; line-height: 1.6; }
+        .description { margin-bottom: 1.6rem; color: #475569; }
+        .details-list { list-style: none; padding: 0; display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 10px 16px; }
+        .details-list li { background:white; padding:0.8rem 1.2rem; border-radius:12px; box-shadow:0 2px 8px rgba(59,130,246,0.1); }
+        .comments-section { margin-top: 2.2rem; }
+        .comments-section h2 { font-size: 1.8rem; margin-bottom: 0.8rem; color:#2563eb; border-bottom:2px solid #2563eb; padding-bottom:4px; }
+        .comment-form textarea { width:100%; border-radius:10px; border:1px solid #94a3b8; padding:0.8rem 1rem; font-size:1rem; resize:vertical; }
+        .btn-submit, .btn-cancel { padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; font-size: 1rem; }
+        .btn-submit { background:#2563eb; color:#fff; } .btn-submit:hover{ background:#1e40af; }
+        .btn-cancel { background:#9ca3af; color:#fff; } .btn-cancel:hover{ background:#6b7280; }
+        .login-link { color:#2563eb; font-weight:600; text-decoration:underline; }
+        .comments-list { list-style:none; padding:0; margin-top:1rem; display:flex; flex-direction:column; gap:1rem; }
+        .comment-item { position:relative; padding:1.25rem; background:#f8fafc; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.05); padding-top:3.2rem; }
+        .comment-header { display:flex; justify-content:space-between; color:#334155; font-weight:600; }
+        .comment-date { color:#94a3b8; font-weight:400; }
+        .comment-actions { position:absolute; top:0.6rem; right:0.6rem; display:flex; gap:0.4rem; }
+        .btn-edit, .btn-delete { padding:6px 12px; border-radius:6px; font-weight:600; border:1.5px solid transparent; cursor:pointer; }
+        .btn-edit { background:#fbbf24; color:#92400e; border-color:#fbbf24; } .btn-edit:hover{ background:#f59e0b; color:#fff; }
+        .btn-delete { background:#ef4444; color:#fff; border-color:#ef4444; } .btn-delete:hover{ background:#dc2626; }
+        .btn { display:inline-block; padding:0.5rem 1.2rem; border-radius:8px; font-weight:700; text-decoration:none; }
+        .btn-edit-course { background:#fbbf24; color:#92400e; border:1.5px solid #fbbf24; }
+        .btn-delete-course { background:#ef4444; color:#fff; border:1.5px solid #ef4444; }
+        .btn-add-lesson { background:#3b82f6; color:#fff; border:1.5px solid #3b82f6; }
       `}</style>
     </>
   );

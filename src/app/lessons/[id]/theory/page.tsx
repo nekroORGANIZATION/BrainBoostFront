@@ -19,7 +19,7 @@ export default function TheoryPage() {
     if (!id) return;
 
     axios
-      .get(`http://172.17.10.22:8000/api/lesson/theories/?lesson=${id}`)
+      .get(`http://127.0.0.1:8000/api/lesson/theories/?lesson=${id}`)
       .then((res) => {
         if (res.data.length > 0) {
           setContent(res.data[0].theory_text);
@@ -35,9 +35,9 @@ export default function TheoryPage() {
   const handleSave = async (html: string) => {
     const payload = { lesson: id, theory_text: html };
     if (theoryId) {
-      await axios.put(`http://172.17.10.22:8000/api/lesson/theories/${theoryId}/`, payload);
+      await axios.put(`http://127.0.0.1:8000/api/lesson/theories/${theoryId}/`, payload);
     } else {
-      const res = await axios.post(`http://172.17.10.22:8000/api/lesson/theories/`, payload);
+      const res = await axios.post(`http://127.0.0.1:8000/api/lesson/theories/`, payload);
       setTheoryId(res.data.id);
     }
   };
@@ -93,7 +93,7 @@ export default function TheoryPage() {
 
                 try {
                   const res = await axios.post(
-                    'http://172.17.10.22:8000/api/ai/ask/',
+                    'http://127.0.0.1:8000/api/ai/ask/',
                     {
                       lesson_id: id,
                       question: userInput,
@@ -109,8 +109,8 @@ export default function TheoryPage() {
                   const aiMessage = { role: 'assistant', text: res.data.answer };
                   setChatMessages((prev) => [...prev, aiMessage]);
                 } catch (error) {
-                  const err = error as AxiosError<unknown>;
-                  const errText = (err.response?.data as { error?: string })?.error || 'Помилка з боку ШІ.';
+                  const err = error as AxiosError<any>;
+                  const errText = err.response?.data?.error || 'Помилка з боку ШІ.';
                   setChatMessages((prev) => [
                     ...prev,
                     { role: 'assistant', text: `❌ ${errText}` },

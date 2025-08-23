@@ -10,7 +10,7 @@ export default function LessonsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    axios.get('http://172.17.10.22:8000/api/lesson/lessons/')
+    axios.get('http://127.0.0.1:8000/api/lesson/lessons/')
       .then((res) => {
         setLessons(res.data.results || []); // берем только results
         setLoading(false);

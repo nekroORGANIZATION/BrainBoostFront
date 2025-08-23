@@ -34,7 +34,7 @@ const BubbleMenu: React.FC<BubbleMenuProps> = ({ editor, children }) => {
 
       setCoords({
         left: rect.left + window.pageXOffset,
-        top: rect.top + window.pageYOffset - 40, // 40px вгору
+        top: rect.top + window.pageYOffset - 40,
       });
 
       setIsActive(true);

@@ -10,8 +10,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  OWNER: nekroORGANIZATION
-  IMAGE_NAME: frontend   # ім'я образу у GHCR
+  OWNER: nekroorganization
+  IMAGE_NAME: frontend  
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:

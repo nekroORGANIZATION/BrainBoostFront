@@ -27,8 +27,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ secrets.GHCR_USER }}
+          password: ${{ secrets.GHCR_WRITE_TOKEN }}
 
       # ⚠️ Якщо Dockerfile НЕ в корені репо, заміни context: '.' на потрібну теку (наприклад ./frontend)
       - name: Build & push image

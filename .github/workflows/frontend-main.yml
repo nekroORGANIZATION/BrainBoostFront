@@ -1,4 +1,4 @@
-name: Frontend → Prod (build & push)
+name: Frontend → Prod (build in GitHub, run on VM)
 
 on:
   push:
@@ -9,7 +9,7 @@ env:
   REGISTRY: ghcr.io
   OWNER: nekroorganization
   IMAGE_NAME: frontend
-  IMAGE_TAG: prod
+  IMAGE_TAG: ${{ github.sha }}
 
 permissions:
   contents: read
@@ -36,4 +36,25 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:prod
+
+  deploy-to-prod:
+    runs-on: self-hosted
+    needs: build-and-push
+    environment: main
+    steps:
+      - name: Deploy via SSH
+        shell: bash
+        run: |
+          mkdir -p "${{ runner.temp }}"
+          printf '%s\n' "${{ secrets.RUNNER_SSH_KEY }}" | sed 's/\r$//' > "${{ runner.temp }}/k"
+          chmod 600 "${{ runner.temp }}/k"
+
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.RUNNER_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.RUNNER_USER }}@${{ secrets.RUNNER_HOST }}" '
+              set -e
+              cd /opt/myapp
+              docker compose pull frontend
+              docker compose up -d frontend
+              docker image prune -f
+            '

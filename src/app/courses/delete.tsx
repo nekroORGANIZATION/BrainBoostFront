@@ -10,14 +10,14 @@ export default function CourseDeletePage() {
   const [courseTitle, setCourseTitle] = useState('');
 
   useEffect(() => {
-    axios.get(`http://127.0.0.1:8000/courses/${id}/`)
+    axios.get(`http://172.17.10.22:8000/courses/${id}/`)
       .then(res => setCourseTitle(res.data.title))
       .catch(err => console.error(err));
   }, [id]);
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://127.0.0.1:8000/courses/${id}/delete/`, {
+      await axios.delete(`hhttp://172.17.10.22:8000/courses/${id}/delete/`, {
         withCredentials: true,
       });
       router.push('/courses');

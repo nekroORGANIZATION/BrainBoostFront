@@ -18,7 +18,7 @@ export default function CourseDetailsPage() {
     useEffect(() => {
         if (!id) return;
         axios
-        .get(`http://127.0.0.1:8000/courses/${id}/`)
+        .get(`http://172.17.10.22:8000/courses/${id}/`)
         .then((res) => setCourse(res.data))
         .catch((err) => console.error('Ошибка загрузки курса:', err))
         .finally(() => setLoading(false));

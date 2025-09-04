@@ -39,40 +39,79 @@ jobs:
             ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:prod
 
   deploy-to-prod:
-    needs: build-and-push
-    runs-on: self-hosted
-    environment: main
-    steps:
-      - name: Deploy via SSH
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "${{ runner.temp }}"
-          KEYFILE="${{ runner.temp }}/main_ssh_key"
+  needs: build-and-push
+  runs-on: self-hosted
+  environment: main
+  steps:
+    - name: Prepare SSH key (robust: b64 or multiline)
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ runner.temp }}"
+        KEYFILE="${{ runner.temp }}/main_ssh_key"
 
-          # зберігаємо приватний ключ з Secret у файл (багаторядковий OpenSSH)
-          # sed зніме можливі \r якщо ключ вставили з Windows
+        if [ -n "${{ secrets.MAIN_SSH_KEY_B64 || '' }}" ]; then
+          # ВАРІАНТ 1: секрет у base64 одним рядком
+          echo "${{ secrets.MAIN_SSH_KEY_B64 }}" | base64 -d | tr -d '\r' > "$KEYFILE"
+        else
+          # ВАРІАНТ 2: секрет — багаторядковий OpenSSH (BEGIN/END)
           printf '%s\n' "${{ secrets.MAIN_SSH_KEY }}" | sed 's/\r$//' > "$KEYFILE"
-          chmod 600 "$KEYFILE"
+        fi
+        chmod 600 "$KEYFILE"
 
-          # порт опційний: якщо секрет MAIN_SSH_PORT не заданий — беремо 22
-          PORT="${{ secrets.MAIN_SSH_PORT }}"
-          if [ -z "$PORT" ]; then PORT=22; fi
+        # Переконатися, що ключ читається і БЕЗ пароля (інакше впаде тут)
+        if ! DERIVED_PUB="$(ssh-keygen -y -f "$KEYFILE" 2>/dev/null)"; then
+          echo "✖ SSH key is not a valid OpenSSH private key OR it is passphrase-protected."
+          echo "   Якщо ключ із паролем — згенеруй новий без пароля: ssh-keygen -t ed25519 -N \"\" -f ~/.ssh/ga_ed25519_main"
+          exit 1
+        fi
+        # Показати fingerprint (не секрет)
+        echo "$DERIVED_PUB" > "${{ runner.temp }}/derived.pub"
+        echo "Fingerprint:"
+        ssh-keygen -lf "${{ runner.temp }}/derived.pub"
 
-          # логінимося на прод; передаємо GHCR_USER/READ_TOKEN для docker login на хості
-          ssh -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
-            "GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_READ_TOKEN='${{ secrets.GHCR_READ_TOKEN }}' bash -s" << 'EOSH'
-              set -euo pipefail
-              cd /opt/myapp
-              if [ -n "${GHCR_USER:-}" ] && [ -n "${GHCR_READ_TOKEN:-}" ]; then
-                echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
-              fi
-              docker compose pull frontend
-              docker compose up -d frontend
-              docker image prune -f
-          EOSH
-      - name: Cleanup SSH key
-        if: always()
-        run: |
-          rm -f "${{ runner.temp }}/main_ssh_key"
+        # Підтримка кастомного порту
+        PORT="${{ secrets.MAIN_SSH_PORT }}"
+        if [ -z "$PORT" ]; then PORT=22; fi
+        echo "$PORT" > "${{ runner.temp }}/ssh_port"
+
+        # known_hosts (безпечно вимкнено якщо keyscan недоступний)
+        if command -v ssh-keyscan >/dev/null 2>&1; then
+          ssh-keyscan -p "$PORT" -H "${{ secrets.MAIN_TARGET_HOST }}" >> ~/.ssh/known_hosts || true
+          chmod 644 ~/.ssh/known_hosts
+        fi
+
+    - name: Sanity SSH check
+      shell: bash
+      run: |
+        set -euo pipefail
+        KEYFILE="${{ runner.temp }}/main_ssh_key"
+        PORT="$(cat "${{ runner.temp }}/ssh_port")"
+        ssh -vvv -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+          "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
+          "echo OK-from-\$(hostname) as \$(whoami)"
+
+    - name: Deploy via SSH
+      shell: bash
+      run: |
+        set -euo pipefail
+        KEYFILE="${{ runner.temp }}/main_ssh_key"
+        PORT="$(cat "${{ runner.temp }}/ssh_port")"
+
+        ssh -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+          "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
+          "GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_READ_TOKEN='${{ secrets.GHCR_READ_TOKEN }}' bash -s" << 'EOSH'
+            set -euo pipefail
+            cd /opt/myapp
+            if [ -n "${GHCR_USER:-}" ] && [ -n "${GHCR_READ_TOKEN:-}" ]; then
+              echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
+            fi
+            docker compose pull frontend
+            docker compose up -d frontend
+            docker image prune -f
+EOSH
+
+    - name: Cleanup SSH key
+      if: always()
+      run: |
+        rm -f "${{ runner.temp }}/main_ssh_key" "${{ runner.temp }}/derived.pub

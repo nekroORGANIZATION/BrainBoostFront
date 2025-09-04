@@ -344,7 +344,7 @@ type IconProps = {
 };
 
 /* Facebook */
-export function FbIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
+function FbIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -388,7 +388,7 @@ export function IgIcon({ size = 20, className = 'text-[#1345DE]', title }: IconP
 }
 
 /* Telegram */
-export function TgIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
+function TgIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

@@ -1,15 +1,20 @@
-// context/AuthContext.tsx
+// src/context/AuthContext.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import axios, { AxiosInstance } from 'axios';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import axios from 'axios';
+import http, { API_BASE, ME_URL, LOGIN_URL } from '@/lib/http';
+import { setAuthHeader } from '@/lib/http';
 
-type User = {
+/* =========================
+   Типи
+========================= */
+export type User = {
   id: number;
   username: string;
   email: string;
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   profile_picture: string | null;
   is_teacher: boolean;
   is_superuser: boolean;
@@ -17,10 +22,12 @@ type User = {
 };
 
 type LoginOverload =
-  | ((username: string, password: string, remember?: boolean) => Promise<void>) // новий спосіб
-  | ((access: string, refresh?: string) => Promise<void>);                      // старий спосіб
+  // новий спосіб: креди + прапорець remember
+  ((username: string, password: string, remember?: boolean) => Promise<void>) |
+  // старий спосіб: готові токени
+  ((access: string, refresh?: string | null) => Promise<void>);
 
-interface AuthContextType {
+export interface AuthContextType {
   isAuthenticated: boolean;
   accessToken: string | null;
   user: User | null;
@@ -28,195 +35,183 @@ interface AuthContextType {
   logout: () => void;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
-
-const PROFILE_URL = '/accounts/api/profile/';
-const LOGIN_URL   = '/accounts/api/login/';
-const REFRESH_URL = '/accounts/api/token/refresh/';
-
+/* =========================
+   Контекст
+========================= */
 const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   accessToken: null,
   user: null,
-  // заповнюється реальними імплементаціями нижче
   login: async () => {},
   logout: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
 
-/* ========= helpers ========= */
+/* =========================
+   Helpers (storage)
+========================= */
 const inBrowser = typeof window !== 'undefined';
 
-function getStored(key: 'access'|'refresh'): string | null {
+function readStored(key: 'access' | 'refresh'): string | null {
   if (!inBrowser) return null;
-  return localStorage.getItem(key) ?? sessionStorage.getItem(key);
+  // спершу шукаємо в sessionStorage, потім у localStorage
+  return sessionStorage.getItem(key) ?? localStorage.getItem(key);
 }
 
-function writeStored(key: 'access'|'refresh', value: string | null, remember: boolean) {
+/** Куди писати токени — в local чи session — вирішуємо прапорцем remember */
+function writeStored(key: 'access' | 'refresh', value: string | null, remember: boolean) {
   if (!inBrowser) return;
   const target = remember ? localStorage : sessionStorage;
   const other  = remember ? sessionStorage : localStorage;
+
   if (value === null) {
     target.removeItem(key);
     other.removeItem(key);
   } else {
     target.setItem(key, value);
-    other.removeItem(key);
+    other.removeItem(key); // тримаємо токен лише в одному місці
   }
 }
 
-/** Дуже простенька перевірка на JWT-подібний рядок */
-function looksLikeJwt(token?: string | null) {
-  return !!token && token.split('.').length === 3;
+function clearAllTokens() {
+  if (!inBrowser) return;
+  localStorage.removeItem('access');  localStorage.removeItem('refresh');
+  sessionStorage.removeItem('access'); sessionStorage.removeItem('refresh');
 }
 
+function looksLikeJwt(t?: string | null) {
+  return !!t && t.split('.').length === 3;
+}
+
+/* =========================
+   Provider
+========================= */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessToken]   = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
-  const [rememberFlag, setRememberFlag] = useState<boolean>(true); // куди писати токени
-  const [user, setUser] = useState<User | null>(null);
+  const [rememberFlag, setRememberFlag] = useState<boolean>(true);
+  const [user, setUser]                 = useState<User | null>(null);
 
-  // єдиний axios instance з baseURL і авторизацією
-  const http: AxiosInstance = useMemo(() => {
-    const i = axios.create({
-      baseURL: API_BASE,
-      headers: { 'Content-Type': 'application/json' },
-    });
-    return i;
-  }, []);
-
-  // підхопити токени при старті
+  // 1) Старт: синхронно підхопити токени та ОДРАЗУ прокинути їх в axios через setAuthHeader
   useEffect(() => {
-    const a = getStored('access');
-    const r = getStored('refresh');
+    const a = readStored('access');
+    const r = readStored('refresh');
     setAccessToken(a);
     setRefreshToken(r);
-
-    // визначимо "запам'ятати" за місцем збереження access
-    if (inBrowser) {
-      const inLocal = localStorage.getItem('access') != null;
-      setRememberFlag(inLocal); // true -> localStorage, false -> sessionStorage
-    }
+    // якщо токен у localStorage — вважаємо "remember = true"
+    if (inBrowser) setRememberFlag(localStorage.getItem('access') != null);
+    // критично: відразу в http, щоб перші запити мали Authorization
+    setAuthHeader(a || null);
   }, []);
 
-  // проставляємо Authorization в інстансі
+  // 2) Будь-яка зміна accessToken → оновлюємо заголовок інстанса
   useEffect(() => {
-    if (accessToken) {
-      http.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-    } else {
-      delete http.defaults.headers.common['Authorization'];
-    }
-  }, [http, accessToken]);
+    setAuthHeader(accessToken || null);
+  }, [accessToken]);
 
-  // тягнемо профіль при наявності access
+  // 3) Тягнемо профіль, коли зʼявився access
   useEffect(() => {
     if (!accessToken) {
       setUser(null);
       return;
     }
-    http.get(PROFILE_URL)
+    http
+      .get(ME_URL)
       .then(res => setUser(res.data as User))
       .catch(() => setUser(null));
-  }, [http, accessToken]);
+  }, [accessToken]);
 
-  // авто-refresh на 401
-  useEffect(() => {
-    const id = http.interceptors.response.use(
-      (resp) => resp,
-      async (error) => {
-        const original = error.config;
-        if (
-          error?.response?.status === 401 &&
-          !original._retry &&
-          refreshToken
-        ) {
-          original._retry = true;
-          try {
-            const res = await axios.post(`${API_BASE}${REFRESH_URL}`, { refresh: refreshToken });
-            const newAccess = res.data?.access as string;
-            // зберігаємо новий access у ту ж “пам'ять”, що й попередній
-            writeStored('access', newAccess, rememberFlag);
-            setAccessToken(newAccess);
-            http.defaults.headers.common['Authorization'] = `Bearer ${newAccess}`;
-            original.headers['Authorization'] = `Bearer ${newAccess}`;
-            return http(original);
-          } catch (e) {
-            // рефреш не вдалось — розлогін
-            logout();
-          }
-        }
-        return Promise.reject(error);
-      }
-    );
-    return () => http.interceptors.response.eject(id);
-  }, [http, refreshToken, rememberFlag]);
-
-  /* ========= login (два режими) ========= */
+  /* =========================
+     login (два режими)
+  ========================= */
   async function loginImpl(a: string, b?: string, remember?: boolean): Promise<void> {
-    // якщо прийшло 3-й аргумент (remember) — це режим username/password
     const isCredentialsMode = typeof remember === 'boolean';
 
+    // Режим 1: логін по username/password (+ remember)
     if (isCredentialsMode) {
-      const username = a;
-      const password = b ?? '';
+      const username   = a;
+      const password   = b ?? '';
       const rememberMe = !!remember;
 
-      const res = await axios.post(`${API_BASE}${LOGIN_URL}`, { username, password });
-      const { access, refresh } = res.data as { access: string; refresh: string };
+      // логінимось БЕЗ інтерцептора (через axios напряму або той же http — вже не принципово)
+      const res  = await axios.post(`${API_BASE}${LOGIN_URL}`, { username, password });
+      const data = res.data || {};
 
+      // підтримуємо різні формати відповіді
+      const access =
+        data.access ??
+        data.access_token ??
+        data?.tokens?.access ??
+        null;
+
+      const refresh =
+        data.refresh ??
+        data.refresh_token ??
+        data?.tokens?.refresh ??
+        null;
+
+      if (!looksLikeJwt(access)) {
+        clearAllTokens();
+        setAuthHeader(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        setUser(null);
+        throw new Error('Сервер не повернув коректний JWT access-токен.');
+      }
+
+      // зберегти в storage згідно remember
       writeStored('access', access, rememberMe);
-      writeStored('refresh', refresh, rememberMe);
+      if (refresh) writeStored('refresh', refresh, rememberMe);
+
+      // в памʼять та в axios
+      setAuthHeader(access);
       setAccessToken(access);
       setRefreshToken(refresh);
       setRememberFlag(rememberMe);
 
-      http.defaults.headers.common['Authorization'] = `Bearer ${access}`;
-
-      const me = await http.get(PROFILE_URL);
-      setUser(me.data as User);
+      // перший прогрів профілю
+      try {
+        const me = await http.get(ME_URL);
+        setUser(me.data as User);
+      } catch {
+        setUser(null);
+      }
       return;
     }
 
-    // інакше — це режим “старий” із токенами
-    const access = a;
+    // Режим 2: старий API — передають готові токени
+    const access  = a;
     const refresh = b || null;
-    const rememberMe = rememberFlag; // залишаємо попередній спосіб збереження
 
-    // якщо дали не-JWT access — сприймемо як помилковий виклик
     if (!looksLikeJwt(access)) {
-      throw new Error('login(access, refresh): "access" виглядає некоректно. Або викличте login(username, password, remember).');
+      throw new Error('login(access, refresh): "access" некоректний. Викличте login(username, password, remember).');
     }
 
-    writeStored('access', access, rememberMe);
-    if (refresh) writeStored('refresh', refresh, rememberMe);
+    // використовуємо поточний rememberFlag (де вже лежать токени — там і лишаємо)
+    writeStored('access', access, rememberFlag);
+    if (refresh) writeStored('refresh', refresh, rememberFlag);
 
+    setAuthHeader(access);
     setAccessToken(access);
     setRefreshToken(refresh);
-    http.defaults.headers.common['Authorization'] = `Bearer ${access}`;
 
     try {
-      const me = await http.get(PROFILE_URL);
+      const me = await http.get(ME_URL);
       setUser(me.data as User);
     } catch {
       setUser(null);
     }
   }
 
-  // підписи-оверлоади для підказок TS
   const login = loginImpl as AuthContextType['login'];
 
   function logout() {
-    if (inBrowser) {
-      localStorage.removeItem('access');
-      localStorage.removeItem('refresh');
-      sessionStorage.removeItem('access');
-      sessionStorage.removeItem('refresh');
-    }
+    clearAllTokens();
+    setAuthHeader(null);
     setAccessToken(null);
     setRefreshToken(null);
     setUser(null);
-    delete http.defaults.headers.common['Authorization'];
   }
 
   return (

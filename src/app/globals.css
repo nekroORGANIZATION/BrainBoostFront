@@ -1,6 +1,59 @@
 @import "tailwindcss";
 
 
+/* Базовые переменные */
+:root {
+  --text-scale: 1;
+  --line-height: 1.7;
+  --letter-spacing: 0;
+  --radius: 12px;
+}
+
+/* Глобальное масштабирование текста */
+html { font-size: calc(16px * var(--text-scale)); }
+body { line-height: var(--line-height); letter-spacing: var(--letter-spacing); }
+
+/* Доп. шрифты */
+.font-system { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
+.font-serif  { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
+.font-mono   { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+/* Подключи OpenDyslexic, если положишь файлы в /public/fonts/OpenDyslexic-Regular.woff2 */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/OpenDyslexic-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+.font-odys { font-family: "OpenDyslexic", ui-sans-serif, system-ui, -apple-system, Roboto, Arial, sans-serif; }
+
+/* Высокий контраст */
+.hc * { outline-color: #1a1a1a; }
+.hc body { background: #fff; color: #000; }
+.hc .ring-slate-200 { --tw-ring-color: #000 !important; }
+
+/* Увеличенный UI (скругления/тени/пэдинги можно масштабировать через переменные при желании) */
+.ui-lg { --radius: 16px; }
+
+/* Снижение анимаций */
+[data-motion="reduce"] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Небольшие полезные утилиты Tailwind-слоями (опционально) */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+}
+
+
+
+
 :root {
   --background: #ffffff;
   --foreground: #000000;

@@ -2,43 +2,64 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import axios, {AxiosError} from 'axios';
+import axios, { AxiosError } from 'axios';
 import TheoryEditor from '@/components/TheoryEditor';
 import { MessageSquare } from 'lucide-react';
 
 export default function TheoryPage() {
-  const { id } = useParams();
-  const [content, setContent] = useState('');
+  const { id } = useParams(); // id уроку
+  const [content, setContent] = useState('<p>Завантаження...</p>');
   const [theoryId, setTheoryId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([]);
   const [userInput, setUserInput] = useState('');
 
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  // --- Завантаження теорії ---
   useEffect(() => {
     if (!id) return;
 
     axios
-      .get(`http://127.0.0.1:8000/api/lesson/theories/?lesson=${id}`)
+      .get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers })
       .then((res) => {
         if (res.data.length > 0) {
           setContent(res.data[0].theory_text);
           setTheoryId(res.data[0].id);
         } else {
           setContent('<p>Напиши теорію тут...</p>');
+          setTheoryId(null);
         }
       })
-      .catch((err) => console.error('❌ Помилка завантаження:', err))
+      .catch((err: AxiosError) => console.error('❌ Помилка завантаження:', err))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, token]);
 
+  // --- Збереження теорії ---
   const handleSave = async (html: string) => {
-    const payload = { lesson: id, theory_text: html };
-    if (theoryId) {
-      await axios.put(`http://127.0.0.1:8000/api/lesson/theories/${theoryId}/`, payload);
-    } else {
-      const res = await axios.post(`http://127.0.0.1:8000/api/lesson/theories/`, payload);
-      setTheoryId(res.data.id);
+    if (!id) return;
+    try {
+      if (theoryId) {
+        const res = await axios.put(
+          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/${theoryId}/`,
+          { theory_text: html },
+          { headers }
+        );
+        setContent(res.data.theory_text);
+      } else {
+        const res = await axios.post(
+          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`,
+          { theory_text: html },
+          { headers }
+        );
+        setTheoryId(res.data.id);
+        setContent(res.data.theory_text);
+      }
+    } catch (error) {
+      const err = error as AxiosError<any>;
+      console.error('❌ Помилка збереження:', err.response?.data || err.message);
     }
   };
 
@@ -85,7 +106,7 @@ export default function TheoryPage() {
             />
             <button
               onClick={async () => {
-                if (!userInput.trim()) return;
+                if (!userInput.trim() || !id) return;
 
                 const userMessage = { role: 'user', text: userInput };
                 setChatMessages((prev) => [...prev, userMessage]);
@@ -93,17 +114,9 @@ export default function TheoryPage() {
 
                 try {
                   const res = await axios.post(
-                    'http://127.0.0.1:8000/api/ai/ask/',
-                    {
-                      lesson_id: id,
-                      question: userInput,
-                    },
-                    {
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('access')}`,
-                      },
-                    }
+                    'https://brainboost.pp.ua/api/api/ai/ask/',
+                    { lesson_id: id, question: userInput },
+                    { headers: { ...headers, 'Content-Type': 'application/json' } }
                   );
 
                   const aiMessage = { role: 'assistant', text: res.data.answer };
@@ -111,17 +124,13 @@ export default function TheoryPage() {
                 } catch (error) {
                   const err = error as AxiosError<any>;
                   const errText = err.response?.data?.error || 'Помилка з боку ШІ.';
-                  setChatMessages((prev) => [
-                    ...prev,
-                    { role: 'assistant', text: `❌ ${errText}` },
-                  ]);
+                  setChatMessages((prev) => [...prev, { role: 'assistant', text: `❌ ${errText}` }]);
                 }
               }}
               className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700"
             >
               ➤
             </button>
-
           </div>
         </div>
       )}

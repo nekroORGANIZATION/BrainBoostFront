@@ -23,48 +23,71 @@ type Test = {
   title: string;
 };
 
+const getToken = (): string | null => {
+  return (
+    localStorage.getItem('access') ||
+    localStorage.getItem('accessToken') ||
+    sessionStorage.getItem('access') ||
+    sessionStorage.getItem('accessToken') ||
+    null
+  );
+};
+
 export default function LessonDetailsPage() {
   const { id } = useParams();
   const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [test, setTest] = useState<Test | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [test, setTest] = useState<Test | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     if (!id) return;
 
+    const token = getToken();
+    if (!token) {
+      setError('Користувач не авторизований');
+      setLoading(false);
+      return;
+    }
+
+    const headers = { Authorization: `Bearer ${token}` };
+
     setLoading(true);
-    // Завантажуємо урок
-    axios
-      .get(`http://127.0.0.1:8000/api/lesson/lessons/${id}/`)
-      .then((res) => {
-        setLesson(res.data);
+
+    // 1️⃣ Завантажуємо сам урок
+    const lessonReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/admin/lessons/${id}/`, { headers });
+
+    // 2️⃣ Завантажуємо теорії окремо
+    const theoriesReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers });
+
+    Promise.all([lessonReq, theoriesReq])
+      .then(([lessonRes, theoriesRes]) => {
+        const lessonData = lessonRes.data;
+        const theories: CourseTheory[] = theoriesRes.data || [];
+        setLesson({ ...lessonData, theories });
       })
-      .catch((err) => console.error('Помилка завантаження уроку:', err))
+      .catch((err) => {
+        console.error('Помилка завантаження уроку або теорії:', err);
+        if (err.response?.status === 404) setError('Урок або теорія не знайдені');
+        else if (err.response?.status === 401) setError('Неавторизований');
+        else setError('Помилка завантаження уроку');
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
     if (!lesson) return;
+    const token = getToken();
+    if (!token) return;
 
-    // Завантажуємо тест(и) для уроку
     axios
-      .get(`http://127.0.0.1:8000/api/tests/?lesson_id=${lesson.id}`)
+      .get(`https://brainboost.pp.ua/api/api/tests/?lesson_id=${lesson.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       .then((res) => {
-        console.log('Tests API response:', res.data);
-
-        // Якщо є поле results, беремо його, інакше просто res.data
         const tests = res.data.results || res.data;
-
-        console.log('Parsed tests:', tests);
-
-        if (tests.length > 0) {
-          setTest(tests[0]);
-          console.log('Selected test:', tests[0]);
-        } else {
-          setTest(null);
-          console.log('No tests found for this lesson');
-        }
+        setTest(tests.length > 0 ? tests[0] : null);
       })
       .catch((err) => {
         console.error('Помилка завантаження тестів:', err);
@@ -72,10 +95,9 @@ export default function LessonDetailsPage() {
       });
   }, [lesson]);
 
-  console.log('Current test state:', test);
-
   if (loading) return <p className="text-center text-lg text-gray-400">Завантаження...</p>;
-  if (!lesson) return <p className="text-center text-lg text-red-500">Урок не знайдено</p>;
+  if (error) return <p className="text-center text-lg text-red-500">{error}</p>;
+  if (!lesson) return null;
 
   return (
     <main className="max-w-3xl mx-auto mt-10 p-6 bg-white shadow-xl rounded-xl">
@@ -89,28 +111,24 @@ export default function LessonDetailsPage() {
       {lesson.theories && lesson.theories.length > 0 ? (
         <div className="prose max-w-none mt-6">
           <h2 className="text-xl font-semibold mb-2">Теорія</h2>
-          {lesson.theories[lesson.theories.length - 1] && (
-            <>
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: lesson.theories[lesson.theories.length - 1].theory_text,
-                }}
-              />
-              {lesson.theories[lesson.theories.length - 1].image && (
-                <img
-                  src={`http://127.0.0.1:8000${lesson.theories[lesson.theories.length - 1].image}`}
-                  alt="Ілюстрація до теорії"
-                  className="mt-4 rounded shadow"
-                />
-              )}
-            </>
+          <div
+            dangerouslySetInnerHTML={{
+              __html: lesson.theories[lesson.theories.length - 1].theory_text,
+            }}
+          />
+          {lesson.theories[lesson.theories.length - 1].image && (
+            <img
+              src={`https://brainboost.pp.ua/api${lesson.theories[lesson.theories.length - 1].image}`}
+              alt="Ілюстрація до теорії"
+              className="mt-4 rounded shadow"
+            />
           )}
         </div>
       ) : (
         <p className="mt-6 text-gray-400 italic">Теорія ще не додана</p>
       )}
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 mt-6">
         <button
           onClick={() => router.push(`/lessons/${lesson.id}/theory`)}
           className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition"

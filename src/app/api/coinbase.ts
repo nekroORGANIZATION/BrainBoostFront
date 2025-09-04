@@ -1,6 +1,6 @@
 export async function POST(req: Request) {
   const body = await req.json();
-  const res = await fetch('http://localhost:8000/create-crypto-payment/', {
+  const res = await fetch('https://brainboost.pp.ua/api/create-crypto-payment/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

@@ -1,34 +1,75 @@
 'use client';
 
-import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
-import { usePathname } from "next/navigation";
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import { usePathname } from 'next/navigation';
 
-export default function Navbar() {
+type NavbarProps = {
+  /** Маршрути, на яких навбар взагалі не показуємо */
+  hideOn?: string[];
+};
+
+export default function Navbar({ hideOn = [] }: NavbarProps) {
   const { isAuthenticated, logout } = useAuth();
   const pathname = usePathname();
 
+  // ховаємо навбар на вказаних маршрутах
+  const shouldHide = hideOn.some(
+    (p) => pathname === p || pathname.startsWith(p + '/')
+  );
+  if (shouldHide) return null;
+
   const menuItems = [
-    { href: "/courses", label: "Всі курси" },
-    { href: "/reviews", label: "Відгуки" },
-    { href: "/faq", label: "Питання та відповіді" },
-    { href: "/about", label: "Про нас" },
-    { href: "/contacts", label: "Контакти" },
+    { href: '/courses', label: 'Всі курси' },
+    { href: '/reviews', label: 'Відгуки' },
+    { href: '/faq', label: 'Питання та відповіді' },
+    { href: '/about', label: 'Про нас' },
+    { href: '/contacts', label: 'Контакти' },
   ];
 
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/');
+
+  const matched = menuItems.find((i) => isActive(i.href));
+  const crumbLabel =
+    matched?.label ||
+    decodeURIComponent(
+      pathname.split('/').filter(Boolean).slice(-1)[0] || ''
+    );
+
   const UserIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
-         strokeWidth="2" viewBox="0 0 24 24" className="w-6 h-6">
-      <path strokeLinecap="round" strokeLinejoin="round"
-            d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      className="w-6 h-6"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"
+      />
     </svg>
   );
 
   const LogoutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor"
-         strokeWidth="2" viewBox="0 0 24 24" className="w-6 h-6">
-      <path strokeLinecap="round" strokeLinejoin="round"
-            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+      className="w-6 h-6"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12"
+      />
     </svg>
   );
 
@@ -37,7 +78,10 @@ export default function Navbar() {
       {/* Верхня навігація */}
       <nav className="max-w-[1440px] mx-auto flex items-center justify-between px-[118px] h-[72px]">
         {/* Лого */}
-        <Link href="/" className="font-[700] text-[34px] text-[#021C4E] leading-[36px]">
+        <Link
+          href="/"
+          className="font-[700] text-[34px] text-[#021C4E] leading-[36px]"
+        >
           Brainboost
         </Link>
 
@@ -47,7 +91,11 @@ export default function Navbar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`${pathname === item.href ? "text-[#1345DE]" : "hover:text-[#1345DE]"}`}
+              className={
+                isActive(item.href)
+                  ? 'text-[#1345DE]'
+                  : 'hover:text-[#1345DE]'
+              }
             >
               {item.label}
             </Link>
@@ -60,6 +108,7 @@ export default function Navbar() {
             <span className="text-[#1345DE] cursor-pointer">UA</span>
             <span>ENG</span>
           </div>
+
           {!isAuthenticated ? (
             <Link
               href="/login"
@@ -69,10 +118,22 @@ export default function Navbar() {
             </Link>
           ) : (
             <div className="flex items-center gap-4">
+              {/* опц.: посилання у вчительську панель, якщо вона є */}
+              <Link
+                href="/teacher"
+                className="text-[#1345DE] hover:underline text-[14px] font-[600]"
+              >
+                Викладач
+              </Link>
+
               <Link href="/profile" className="text-[#1345DE] hover:opacity-80">
                 <UserIcon />
               </Link>
-              <button onClick={logout} className="text-[#1345DE] hover:opacity-80">
+              <button
+                onClick={logout}
+                className="text-[#1345DE] hover:opacity-80"
+                aria-label="Вийти"
+              >
                 <LogoutIcon />
               </button>
             </div>
@@ -82,12 +143,14 @@ export default function Navbar() {
 
       {/* Нижній breadcrumb */}
       <div className="max-w-[1440px] mx-auto px-[118px] py-[8px] text-[14px]">
-        <Link href="/" className="text-[#021C4E] hover:underline">Головна</Link>
-        {pathname !== "/" && (
+        <Link href="/" className="text-[#021C4E] hover:underline">
+          Головна
+        </Link>
+        {pathname !== '/' && (
           <>
             <span className="mx-1">/</span>
             <span className="text-[#1345DE]">
-              {menuItems.find((item) => item.href === pathname)?.label || ""}
+              {crumbLabel}
             </span>
           </>
         )}

@@ -1,14 +1,12 @@
 // app/login/page.tsx
 'use client';
 
-import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
-import http, { ME_URL } from '@/lib/http';
+import http, { ME_URL, LOGIN_URL } from '@/lib/http';
 
 export default function LoginPage() {
-  const { login } = useAuth();
   const router = useRouter();
 
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +19,28 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [remember, setRemember] = useState(true);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // зручні хелпери для зберігання токенів у ВСІ потрібні ключі
+  function persistTokens(access: string, refresh: string) {
+    localStorage.setItem('access', access);
+    localStorage.setItem('refresh', refresh);
+    // дублікати для сумісності зі старим кодом
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refreshToken', refresh);
+
+    if (remember) {
+      sessionStorage.setItem('access', access);
+      sessionStorage.setItem('refresh', refresh);
+      sessionStorage.setItem('accessToken', access);
+      sessionStorage.setItem('refreshToken', refresh);
+    } else {
+      sessionStorage.removeItem('access');
+      sessionStorage.removeItem('refresh');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
@@ -31,30 +50,43 @@ export default function LoginPage() {
     const password = String(formData.get('password') || '');
 
     try {
-      await login(username, password, remember);
-      // швидка перевірка
+      // 1) прямий логін на бек
+      const res = await http.post(LOGIN_URL, { username, password });
+      const access = res.data?.access as string | undefined;
+      const refresh = res.data?.refresh as string | undefined;
+
+      if (!access || !refresh) {
+        throw new Error('Сервер не повернув токени доступу.');
+      }
+
+      // 2) зберегти токени під усіма ключами
+      persistTokens(access, refresh);
+
+      // 3) перевірити доступ до профілю (додасть заголовок інтерцептор)
       await http.get(ME_URL).catch(() => {});
+
+      // 4) редірект
       router.push('/profile');
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.error ||
+        err?.message ||
         'Невірний логін або пароль.';
       setError(String(msg));
     } finally {
       setSubmitting(false);
     }
-  };
+  }
 
   const handleGoogleLogin = () => {
-    // якщо маєш бек-енд endpoint — заміни на нього:
-    // window.location.href = `${process.env.NEXT_PUBLIC_API_BASE}/accounts/google/login/`;
-    alert('Google Sign-In буде додано після узгодження OAuth.'); // тимчасово
+    // TODO: заміни на реальний endpoint коли буде OAuth
+    alert('Google Sign-In буде додано після узгодження OAuth.');
   };
 
   const handleReset = async () => {
     try {
-      // Підлаштуй URL під свій бекенд reset
+      // ПІДЛАШТУЙ під свій бекенд reset (URL/поле email)
       const res = await http.post('/accounts/reset-password/', { email: resetEmail });
       if (res.status === 200) {
         setShowResetModal(false);
@@ -165,7 +197,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Права колонка з ілюстрацією */}
+      {/* Права колонка */}
       <div className="hidden md:block w-1/2 bg-blue-900">
         <img src="/images/dog-login.png" alt="Dog with laptop" className="w-full h-full object-cover" />
       </div>

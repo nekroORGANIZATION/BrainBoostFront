@@ -18,7 +18,7 @@ export default function CourseDetailsPage() {
     useEffect(() => {
         if (!id) return;
         axios
-        .get(`http://172.17.10.22:8000/courses/${id}/`)
+        .get(`https://brainboost.pp.ua/api/courses/${id}/`)
         .then((res) => setCourse(res.data))
         .catch((err) => console.error('Ошибка загрузки курса:', err))
         .finally(() => setLoading(false));

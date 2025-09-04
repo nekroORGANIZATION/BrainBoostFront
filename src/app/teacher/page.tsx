@@ -3,9 +3,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { motion, AnimatePresence } from 'framer-motion';
+import TipOfDayCard from '@/components/TipOfDayCard';
 
 /** ===================== CONFIG ===================== */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 /** ===================== TYPES ===================== */
 type Course = {
@@ -15,21 +17,17 @@ type Course = {
   image?: string | null;
   price?: number | string | null;
   rating?: number | string | null;
-  students_count?: number | null;
+  students_count?: number | string | null;
   status?: 'draft' | 'pending' | 'published';
+  author?: number | { id: number; username?: string } | string | null;
+  author_username?: string;
   created_at?: string;
-};
-
-type ReviewSummary = {
-  pending_count: number;
-  today_count: number;
 };
 
 type Summary = {
   revenue_month: number;
   students_total: number;
   courses_total: number;
-  pending_reviews: number;
 };
 
 /** ===================== HELPERS ===================== */
@@ -42,33 +40,45 @@ function n(v: unknown, d = 0) {
   const x = Number(v);
   return Number.isFinite(x) ? x : d;
 }
-function fmt(n: number) {
-  return new Intl.NumberFormat('uk-UA').format(n);
+function fmt(num: number) {
+  return new Intl.NumberFormat('uk-UA').format(num);
 }
-function money(n: number) {
-  return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'USD' }).format(n);
+function money(num: number) {
+  return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'USD' }).format(num);
+}
+function mediaUrl(u?: string | null) {
+  if (!u) return '';
+  return /^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:')
+    ? u
+    : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`;
 }
 
 /** ===================== SMALL UI ===================== */
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
+    <div className={`rounded-2xl bg-white/90 ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
       {children}
     </div>
   );
 }
-function KPI({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function KPI({ label, value, sub, delay = 0 }: { label: string; value: string; sub?: string; delay?: number }) {
   return (
-    <Card>
-      <div className="text-[#0F2E64] text-sm font-semibold">{label}</div>
-      <div className="text-[#1345DE] text-3xl font-extrabold leading-tight">{value}</div>
-      {sub ? <div className="text-slate-600 mt-1 text-sm">{sub}</div> : null}
-    </Card>
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: 'easeOut', delay }}
+    >
+      <Card>
+        <div className="text-[#0F2E64] text-sm font-semibold">{label}</div>
+        <div className="text-[#1345DE] text-3xl font-extrabold leading-tight">{value}</div>
+        {sub ? <div className="text-slate-600 mt-1 text-sm">{sub}</div> : null}
+      </Card>
+    </motion.div>
   );
 }
 function Badge({ children }: { children: React.ReactNode }) {
   return (
-    <span className="rounded-[999px] bg-[#EEF3FF] text-[#1345DE] px-2.5 py-1 text-xs font-semibold ring-1 ring-[#E5ECFF]">
+    <span className="rounded-full bg-[#EEF3FF] text-[#1345DE] px-2.5 py-1 text-xs font-semibold ring-1 ring-[#E5ECFF]">
       {children}
     </span>
   );
@@ -87,15 +97,15 @@ function StatusPill({ status }: { status?: Course['status'] }) {
 }
 function SkeletonRow() {
   return (
-    <div className="grid grid-cols-[56px_1fr_120px_120px_120px] gap-4 items-center py-3">
+    <div className="grid grid-cols-1 md:grid-cols-[56px_1fr_100px_100px_180px] gap-4 items-center py-3">
       <div className="w-14 h-10 bg-slate-200 rounded-md animate-pulse" />
       <div className="space-y-2">
         <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
         <div className="h-3 w-56 bg-slate-200 rounded animate-pulse" />
       </div>
-      <div className="h-6 w-20 bg-slate-200 rounded animate-pulse" />
-      <div className="h-6 w-24 bg-slate-200 rounded animate-pulse" />
-      <div className="h-8 w-28 bg-slate-200 rounded animate-pulse" />
+      <div className="h-6 w-16 bg-slate-200 rounded animate-pulse" />
+      <div className="h-6 w-16 bg-slate-200 rounded animate-pulse" />
+      <div className="h-9 w-40 bg-slate-200 rounded animate-pulse" />
     </div>
   );
 }
@@ -106,6 +116,7 @@ export default function TeacherDashboardPage() {
     isAuthenticated: boolean;
     accessToken: string | null;
     user?: {
+      id?: number;
       username?: string;
       first_name?: string | null;
       profile_picture?: string | null;
@@ -114,101 +125,105 @@ export default function TeacherDashboardPage() {
     } | null;
   };
 
-  /** ------- guards ------- */
   const notLoggedIn = !isAuthenticated || !accessToken;
   const notTeacher = !!user && !user.is_teacher && !user.is_superuser;
 
-  /** ------- state ------- */
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [summary, setSummary] = useState<Summary>({
     revenue_month: 0,
     students_total: 0,
     courses_total: 0,
-    pending_reviews: 0,
   });
-  const [reviewSm, setReviewSm] = useState<ReviewSummary>({ pending_count: 0, today_count: 0 });
+  const [err, setErr] = useState<string | null>(null);
 
-  /** ------- effects: fetch teacher data ------- */
   useEffect(() => {
     if (notLoggedIn || notTeacher) {
       setLoading(false);
       return;
     }
+    // ждём, пока будет известен user (id/username), чтобы корректно фильтровать
+    if (!user?.id && !user?.username) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
+
     async function load() {
       setLoading(true);
+      setErr(null);
+
       try {
-        const headers = { Authorization: `Bearer ${accessToken}` };
+        // ОДИН запрос ко всем курсам, без author-параметров
+        const url = `${API_BASE}/courses/?page_size=200`;
+        const r = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken!}` },
+          cache: 'no-store',
+          signal: controller.signal,
+        });
 
-        /** 1) мої курси як автора (могли назвати інакше — підстрахуємось) */
-        // спроба 1: /courses/my/ (якщо ти додаси endpoint)
-        let myCourses: Course[] = [];
-        try {
-          const res = await fetch(`${API_BASE}/courses/my/`, { headers, cache: 'no-store' });
-          if (res.ok) {
-            const raw = await res.json();
-            myCourses = safeGetArray<Course>(raw);
-          }
-        } catch {_/* ignore */ }
-
-        // спроба 2: /api/courses/?author=me (якщо фільтри)
-        if (myCourses.length === 0) {
-          try {
-            const res = await fetch(`${API_BASE}/api/courses/?author=me`, { headers, cache: 'no-store' });
-            if (res.ok) {
-              const raw = await res.json();
-              myCourses = safeGetArray<Course>(raw);
-            }
-          } catch {_/* ignore */ }
+        if (!r.ok) {
+          throw new Error(`Помилка завантаження курсів: ${r.status}`);
         }
 
-        // нормалізація картинок
-        myCourses = myCourses.map(c => ({
-          ...c,
-          image: c.image ? (c.image.startsWith('http') ? c.image : `${API_BASE}${c.image}`) : null,
-        }));
+        const raw = await r.json();
+        const allCourses = safeGetArray<Course>(raw);
 
-        /** 2) ревʼю/модерація (якщо додаси endpoint) */
-        let rs: ReviewSummary = { pending_count: 0, today_count: 0 };
-        try {
-          const res = await fetch(`${API_BASE}/api/reviews/summary/`, { headers, cache: 'no-store' });
-          if (res.ok) rs = await res.json();
-        } catch {_/* ignore */ }
+        const uid = user?.id;
+        const uname = (user?.username || '').toLowerCase();
 
-        /** 3) зібрати summary з того, що маємо (або фолбек) */
+        // Фронтовая фильтрация: по id автора или по author_username
+        const myCourses = allCourses
+          .filter((c) => {
+            const a = c.author;
+            const byId =
+              typeof a === 'number'
+                ? uid && a === uid
+                : typeof a === 'object' && a && 'id' in a
+                ? uid && (a as any).id === uid
+                : false;
+
+            const byName =
+              c.author_username &&
+              String(c.author_username).toLowerCase() === uname;
+
+            return byId || byName;
+          })
+          .map((c) => ({
+            ...c,
+            image: c.image ? mediaUrl(c.image) : null,
+            rating: n(c.rating, 0),
+            students_count: n(c.students_count, 0),
+            status: c.status || 'draft',
+          }));
+
         const studentsTotal = myCourses.reduce((acc, c) => acc + n(c.students_count), 0);
-        const revenueMonth = Math.round(studentsTotal * 49); // умовно: $49 середній чек/міс
+        const revenueMonth = Math.round(studentsTotal * 49);
         const coursesTotal = myCourses.length;
-        const pendingReviews = rs.pending_count;
 
-        if (!cancelled) {
-          setCourses(myCourses);
-          setReviewSm(rs);
-          setSummary({
-            revenue_month: revenueMonth,
-            students_total: studentsTotal,
-            courses_total: coursesTotal,
-            pending_reviews: pendingReviews,
-          });
+        setCourses(myCourses);
+        setSummary({
+          revenue_month: revenueMonth,
+          students_total: studentsTotal,
+          courses_total: coursesTotal,
+        });
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') {
+          setErr(e?.message || 'Сталася помилка');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
-    load();
-    return () => { cancelled = true; };
-  }, [accessToken, notLoggedIn, notTeacher]);
 
-  /** ------- derived ------- */
+    load();
+    return () => controller.abort();
+  }, [accessToken, notLoggedIn, notTeacher, user?.id, user?.username]);
+
   const recentCourses = useMemo(() => {
     const list = [...courses];
     list.sort((a, b) => +new Date(b.created_at || 0) - +new Date(a.created_at || 0));
     return list.slice(0, 6);
   }, [courses]);
 
-  /** ------- guards UI ------- */
   if (notLoggedIn) {
     return (
       <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top grid place-items-center px-6">
@@ -216,7 +231,7 @@ export default function TeacherDashboardPage() {
           <h1 className="text-2xl font-extrabold text-[#0F2E64]">Потрібен вхід</h1>
           <p className="text-slate-700 mt-1">Щоб відкрити викладацький простір, спершу увійди.</p>
           <div className="mt-4">
-            <Link href="/login" className="inline-flex items-center px-5 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold">
+            <Link href="/login" className="inline-flex items-center px-5 py-2 rounded-xl bg-[#1345DE] text-white font-semibold hover:translate-y-[-1px] transition">
               Увійти
             </Link>
           </div>
@@ -234,10 +249,10 @@ export default function TeacherDashboardPage() {
             Подай заявку на статус викладача та почни створювати свої курси. Після схвалення — тут зʼявиться панель.
           </p>
           <div className="mt-4 flex gap-3">
-            <Link href="/profile" className="px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white">
+            <Link href="/profile" className="px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
               Перейти в профіль
             </Link>
-            <Link href="/teacher/apply" className="px-4 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold">
+            <Link href="/teacher/apply" className="px-4 py-2 rounded-xl bg-[#1345DE] text-white font-semibold hover:translate-y-[-1px] transition">
               Подати заявку
             </Link>
           </div>
@@ -246,24 +261,25 @@ export default function TeacherDashboardPage() {
     );
   }
 
-  /** ------- main UI ------- */
-  const avatar = user?.profile_picture
-    ? (user.profile_picture.startsWith('http') ? user.profile_picture : `${API_BASE}${user.profile_picture}`)
-    : '/images/avatar1.png';
-
+  const avatar = user?.profile_picture ? mediaUrl(user.profile_picture) : '/images/defuser.png';
   const name = user?.first_name ? `${user.first_name}` : (user?.username || 'Викладач');
 
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
       {/* HERO */}
-      <section className="w-[1280px] max-w-[95vw] mx-auto pt-[120px]">
-        <div className="rounded-[24px] bg-white/90 ring-1 ring-[#E5ECFF] p-6 md:p-8 shadow-[0_10px_30px_rgba(2,28,78,0.10)] grid md:grid-cols-[auto_1fr] gap-6">
+      <section className="w-full max-w-screen-xl mx-auto px-4 md:px-6 pt-[92px] md:pt-[112px]">
+        <motion.div
+          initial={{ opacity: 0, y: 14, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="rounded-[24px] bg-white/90 ring-1 ring-[#E5ECFF] p-6 md:p-8 shadow-[0_10px_30px_rgba(2,28,78,0.10)] grid md:grid-cols-[auto_1fr] gap-6"
+        >
           <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white shrink-0">
             <img src={avatar} alt={name} className="w-full h-full object-cover" />
           </div>
           <div className="min-w-0">
             <div className="text-sm text-slate-600">Вітаємо у викладацькому просторі</div>
-            <h1 className="m-0 font-[Afacad] font-bold text-[40px] md:text-[56px] leading-[1.1] text-[#021C4E]">
+            <h1 className="m-0 font-[Afacad] font-bold text-[36px] md:text-[56px] leading-[1.1] text-[#021C4E]">
               {name}
             </h1>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -273,35 +289,40 @@ export default function TeacherDashboardPage() {
 
             {/* Швидкі дії */}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/courses/create" className="px-4 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold">
+              <Link
+                href="/teacher/courses/new"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-[#1345DE] text-white font-semibold shadow-[0_6px_14px_rgba(19,69,222,0.25)] hover:shadow-[0_8px_20px_rgba(19,69,222,0.35)] active:translate-y-[1px] transition"
+              >
                 + Створити курс
               </Link>
-              <Link href="/teacher/courses" className="px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white">
+              <Link href="/teacher/courses" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
                 Мої курси
               </Link>
-              <Link href="/teacher/tests" className="px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white">
-                Тести
+              <Link href="/teacher/chats" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
+                Мої чати
               </Link>
-              <Link href="/teacher/settings" className="px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white">
+              <Link href="/teacher/lessons" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
+                Уроки
+              </Link>
+              <Link href="/teacher/settings" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
                 Налаштування
               </Link>
             </div>
           </div>
-        </div>
+        </motion.div>
       </section>
 
       {/* KPI */}
-      <section className="w-[1280px] max-w-[95vw] mx-auto mt-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <KPI label="Дохід за місяць" value={money(summary.revenue_month)} sub="Орієнтовно" />
-          <KPI label="Студентів" value={fmt(summary.students_total)} />
-          <KPI label="Курсів" value={fmt(summary.courses_total)} />
-          <KPI label="Відгуки, на модерації" value={fmt(summary.pending_reviews)} sub={reviewSm.today_count ? `+${fmt(reviewSm.today_count)} за сьогодні` : undefined} />
+      <section className="w-full max-w-screen-xl mx-auto px-4 md:px-6 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <KPI label="Дохід за місяць" value={money(summary.revenue_month)} sub="Орієнтовно" delay={0.05} />
+          <KPI label="Студентів" value={fmt(summary.students_total)} delay={0.1} />
+          <KPI label="Курсів" value={fmt(summary.courses_total)} delay={0.15} />
         </div>
       </section>
 
       {/* CONTENT GRID */}
-      <section className="w-[1280px] max-w-[95vw] mx-auto mt-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 pb-16">
+      <section className="w-full max-w-screen-xl mx-auto px-4 md:px-6 mt-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 pb-20">
         {/* LEFT: courses table */}
         <Card>
           <div className="flex items-center justify-between">
@@ -309,130 +330,141 @@ export default function TeacherDashboardPage() {
             <Link href="/teacher/courses" className="text-[#1345DE] hover:underline text-sm">Всі курси →</Link>
           </div>
 
+          {err && (
+            <div className="mt-3 rounded-lg bg-red-50 text-red-700 ring-1 ring-red-200 px-3 py-2">
+              {err}
+            </div>
+          )}
+
           <div className="mt-4">
             {/* Header */}
-            <div className="hidden md:grid grid-cols-[56px_1fr_120px_120px_120px] gap-4 text-xs font-semibold text-slate-600 pb-2 border-b">
+            <div className="hidden md:grid grid-cols-[56px_1fr_100px_100px_180px] gap-4 text-xs font-semibold text-slate-600 pb-2 border-b border-slate-100">
               <div>Обкладинка</div>
               <div>Курс</div>
-              <div>Студентів</div>
-              <div>Рейтинг</div>
-              <div>Дії</div>
+              <div className="text-center">Студентів</div>
+              <div className="text-center">Рейтинг</div>
+              <div className="text-right">Дії</div>
             </div>
 
             {/* Rows */}
             <div className="divide-y">
-              {loading && (
-                <>
-                  <SkeletonRow /><SkeletonRow /><SkeletonRow />
-                </>
-              )}
+              {loading && (<><SkeletonRow /><SkeletonRow /><SkeletonRow /></>)}
+
               {!loading && recentCourses.length === 0 && (
-                <div className="py-8 text-center text-slate-600">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="py-8 text-center text-slate-600"
+                >
                   Поки що немає курсів. Почнемо з першого?
                   <div className="mt-3">
-                    <Link href="/teacher/courses/new" className="px-4 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold">
+                    <Link href="/teacher/courses/new" className="inline-flex items-center px-4 py-2 rounded-xl bg-[#1345DE] text-white font-semibold hover:translate-y-[-1px] transition">
                       + Створити курс
                     </Link>
                   </div>
-                </div>
+                </motion.div>
               )}
-              {!loading && recentCourses.map((c) => (
-                <div key={c.id} className="grid grid-cols-1 md:grid-cols-[56px_1fr_120px_120px_120px] gap-4 items-center py-3">
-                  {/* cover */}
-                  <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] overflow-hidden bg-slate-100">
-                    {c.image ? <img src={c.image} alt={c.title} className="w-full h-full object-cover" /> : null}
-                  </div>
-                  {/* title/desc */}
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="truncate font-semibold text-[#0F2E64]">{c.title}</div>
-                      <StatusPill status={c.status} />
+
+              <AnimatePresence initial={false}>
+                {!loading && recentCourses.map((c, idx) => (
+                  <motion.div
+                    key={c.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.28, ease: 'easeOut', delay: idx * 0.03 }}
+                    className="grid grid-cols-1 md:grid-cols-[56px_1fr_100px_100px_180px] gap-4 items-center py-3"
+                  >
+                    {/* cover */}
+                    <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] overflow-hidden bg-slate-100">
+                      {c.image ? <img src={String(c.image)} alt={c.title} className="w-full h-full object-cover" /> : null}
                     </div>
-                    {c.description ? (
-                      <div className="text-slate-600 text-sm truncate">
-                        {c.description.length > 120 ? c.description.slice(0, 120) + '…' : c.description}
+
+                    {/* title/desc */}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="truncate font-semibold text-[#0F2E64]">{c.title}</div>
+                        <StatusPill status={c.status} />
                       </div>
-                    ) : null}
-                  </div>
-                  {/* students */}
-                  <div className="text-sm text-[#0F2E64]">{fmt(n(c.students_count))}</div>
-                  {/* rating */}
-                  <div className="text-sm text-[#0F2E64]">{n(c.rating, 0).toFixed(1)} ★</div>
-                  {/* actions */}
-                  <div className="flex gap-2">
-                    <Link href={`/teacher/courses/${c.id}`} className="px-3 py-1.5 rounded-[10px] ring-1 ring-[#E5ECFF] text-sm">
-                      Редагувати
-                    </Link>
-                    <Link href={`/courses/${c.id}/details`} className="px-3 py-1.5 rounded-[10px] bg-[#1345DE] text-white text-sm">
-                      Переглянути
-                    </Link>
-                  </div>
-                </div>
-              ))}
+                      {c.description ? (
+                        <div className="text-slate-600 text-sm truncate">
+                          {c.description.length > 120 ? c.description.slice(0, 120) + '…' : c.description}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* students */}
+                    <div className="text-sm text-[#0F2E64] md:text-center">{fmt(n(c.students_count))}</div>
+
+                    {/* rating */}
+                    <div className="text-sm text-[#0F2E64] md:text-center">{n(c.rating, 0).toFixed(1)} ★</div>
+
+                    {/* actions */}
+                    <div className="flex md:justify-end items-center gap-2 flex-nowrap whitespace-nowrap">
+                      <Link
+                        href={`/teacher/courses/${c.id}`}
+                        className="inline-flex items-center px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] text-sm bg-white hover:ring-[#1345DE] active:translate-y-[1px] transition"
+                      >
+                        Редагувати
+                      </Link>
+                      <Link
+                        href={`/courses/${c.id}/details`}
+                        className="inline-flex items-center px-3 py-1.5 rounded-xl bg-[#1345DE] text-white text-sm shadow-[0_4px_12px_rgba(19,69,222,0.25)] hover:shadow-[0_6px_16px_rgba(19,69,222,0.35)] active:translate-y-[1px] transition"
+                      >
+                        Переглянути
+                      </Link>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         </Card>
 
-        {/* RIGHT: reviews & quick links */}
-        <div className="space-y-6">
-          <Card>
-            <div className="flex items-center justify-between">
-              <h3 className="text-[#0F2E64] font-extrabold text-[18px]">Модерація відгуків</h3>
-              <Badge>beta</Badge>
-            </div>
-            <p className="text-slate-700 mt-2 text-sm">
-              Керуйте відгуками студентів: схвалюйте, відхиляйте та відповідайте.
-            </p>
-
-            <div className="mt-3 grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3">
-                <div className="text-2xl font-extrabold text-[#1345DE]">{fmt(reviewSm.pending_count)}</div>
-                <div className="text-xs text-slate-600 mt-1">На модерації</div>
+        {/* RIGHT: інформаційні блоки */}
+        <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <Card>
+              <h3 className="text-[#0F2E64] font-extrabold text-[18px]">План дій</h3>
+              <ul className="list-disc pl-5 mt-2 text-sm text-slate-700 space-y-1">
+                <li>Створи або доповни програму курсу (розділи, уроки, тести).</li>
+                <li>Додай практичні завдання — це піднімає рейтинг.</li>
+                <li>Оформи гарний прев’ю-банер і короткий опис.</li>
+              </ul>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link href="/teacher/courses/new" className="px-4 py-2 rounded-xl bg-[#1345DE] text-white font-semibold hover:translate-y-[-1px] transition">
+                  + Новий курс
+                </Link>
+                <Link href="/teacher/tests" className="px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
+                  Конструктор тестів
+                </Link>
               </div>
-              <div className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3">
-                <div className="text-2xl font-extrabold text-[#1345DE]">{fmt(summary.courses_total)}</div>
-                <div className="text-xs text-slate-600 mt-1">Курсів</div>
+            </Card>
+          </motion.div>
+
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.05 }}>
+            <Card>
+              <h3 className="text-[#0F2E64] font-extrabold text-[18px]">Швидкі посилання</h3>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <Link href="/teacher/courses" className="rounded-2xl ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] hover:translate-y-[-1px] transition">
+                  Мої курси
+                </Link>
+                <Link href="/teacher/settings" className="rounded-2xl ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] hover:translate-y-[-1px] transition">
+                  Налаштування
+                </Link>
+                <Link href="/reviews" className="rounded-2xl ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] hover:translate-y-[-1px] transition">
+                  Публічні відгуки
+                </Link>
+                <Link href="/profile" className="rounded-2xl ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] hover:translate-y-[-1px] transition">
+                  Профіль
+                </Link>
               </div>
-              <div className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3">
-                <div className="text-2xl font-extrabold text-[#1345DE]">{fmt(summary.students_total)}</div>
-                <div className="text-xs text-slate-600 mt-1">Студентів</div>
-              </div>
-            </div>
+            </Card>
+          </motion.div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/teacher/reviews" className="px-4 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold">
-                Відкрити модерацію
-              </Link>
-              <Link href="/reviews" className="px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white">
-                Подивитись публічні
-              </Link>
-            </div>
-          </Card>
-
-          <Card>
-            <h3 className="text-[#0F2E64] font-extrabold text-[18px]">Швидкі дії</h3>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link href="/teacher/courses/new" className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] transition">
-                + Новий курс
-              </Link>
-              <Link href="/teacher/tests" className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] transition">
-                Тести
-              </Link>
-              <Link href="/teacher/courses" className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] transition">
-                Мої курси
-              </Link>
-              <Link href="/teacher/settings" className="rounded-[12px] ring-1 ring-[#E5ECFF] p-3 hover:ring-[#1345DE] transition">
-                Налаштування
-              </Link>
-            </div>
-          </Card>
-
-          <Card>
-            <h3 className="text-[#0F2E64] font-extrabold text-[18px]">Підказка</h3>
-            <p className="text-sm text-slate-700 mt-1">
-              Додавай у програму більше практики та домашніх — це найсильніше впливає на конверсію в покупку і рейтинг курсу.
-            </p>
-          </Card>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+            <TipOfDayCard />
+          </motion.div>
         </div>
       </section>
     </main>

@@ -1,11 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import http from '@/lib/http';
+import http, { API_BASE } from '@/lib/http';
 import { mediaUrl } from '@/lib/api';
-import { API_BASE } from '@/lib/http';
 
 type Course = {
   id: number;
@@ -15,7 +14,10 @@ type Course = {
   image?: string | null;
   author: number | { id: number; username: string };
   author_username?: string;
-  language?: string;
+
+  // === NEW: язык может приходить как id | строка | объект ===
+  language?: number | string | { id: number; name?: string; title?: string; code?: string; slug?: string };
+
   topic?: string;
   price?: number | string | null;
   rating?: number | string | null;
@@ -30,11 +32,19 @@ type Comment = {
   created_at: string;
 };
 
+type WishlistItem = {
+  id: number;
+  course: { id: number };
+  created_at: string;
+};
+
+// === NEW: тип языка + мапа ===
+type Language = { id: number; name?: string; title?: string; code?: string; slug?: string };
+type LanguagesMap = Record<number, string>;
+
 export default function CourseDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const raw = Array.isArray(params?.id) ? params?.id[0] : String(params?.id || '');
-  const isNumeric = /^\d+$/.test(raw);
 
   const [me, setMe] = useState<Me | null>(null);
   const [course, setCourse] = useState<Course | null>(null);
@@ -46,29 +56,31 @@ export default function CourseDetailPage() {
   const [commentText, setCommentText] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
 
-  // ----- helpers
+  // wishlist
+  const [isFav, setIsFav] = useState(false);
+  const [addingFav, setAddingFav] = useState(false);
+
+  // === NEW: кэш словаря языков ===
+  const [languagesMap, setLanguagesMap] = useState<LanguagesMap>({});
+
+  // --- helpers ---
   async function loadCourseByIdOrSlug(idOrSlug: string) {
-    // 1) /courses/<id>/
     try {
       const r = await http.get(`/courses/${idOrSlug}/`);
       return r.data as Course;
-    } catch (e: any) {
-      // 2) /courses/all/<id>/
+    } catch {
       try {
         const r2 = await http.get(`/courses/all/${idOrSlug}/`);
         return r2.data as Course;
       } catch {
-        // 3) by-slug ендпоїнт (якщо додано)
         try {
           const r3 = await fetch(`${API_BASE}/courses/by-slug/${encodeURIComponent(idOrSlug)}/`, { cache: 'no-store' });
           if (r3.ok) return (await r3.json()) as Course;
         } catch {}
-
-        // 4) фолбек: тягнемо список і шукаємо по slug
         const r4 = await fetch(`${API_BASE}/courses/?page_size=200`, { cache: 'no-store' });
         const j = await r4.json();
-        const arr: Course[] = Array.isArray(j) ? j : (j?.results || []);
-        const found = arr.find((c) => c.slug === idOrSlug);
+        const arr: Course[] = Array.isArray(j) ? j : j?.results || [];
+        const found = arr.find((c) => (c as any).slug === idOrSlug);
         if (!found) throw new Error('Курс не знайдено.');
         return found;
       }
@@ -93,14 +105,46 @@ export default function CourseDetailPage() {
     return !!me && !!authorId && me.id === authorId;
   }
 
-  // ----- load me + course
+  // === NEW: загрузка словаря языков с возможных эндпоинтов ===
+  async function loadLanguagesDict(): Promise<LanguagesMap> {
+    // Пробуем несколько путей — подстройся под свой бэкенд:
+    const endpoints = [
+      '/courses/languages/',            // вариант 1
+      '/api/languages/',                // вариант 2
+      '/courses/language/',             // вариант 3
+      '/course/languages/',             // вариант 4
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const r = await http.get(ep);
+        const raw = Array.isArray(r.data?.results) ? r.data.results : r.data;
+        if (!raw) continue;
+        const arr: Language[] = Array.isArray(raw) ? raw : [];
+        if (!arr.length) continue;
+
+        const map: LanguagesMap = {};
+        for (const it of arr) {
+          if (typeof it?.id === 'number') {
+            map[it.id] = (it.name || it.title || it.code || it.slug || String(it.id)).toString();
+          }
+        }
+        if (Object.keys(map).length) return map;
+      } catch {
+        // пробуем следующий
+      }
+    }
+    return {};
+  }
+
+  // --- init ---
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       setErr(null);
       try {
-        // профіль
+        // profile (optional)
         try {
           const meRes = await http.get('/accounts/api/profile/');
           if (!cancelled) setMe(meRes.data as Me);
@@ -108,16 +152,28 @@ export default function CourseDetailPage() {
           if (!cancelled) setMe(null);
         }
 
-        // курс
-        const data = await loadCourseByIdOrSlug(raw);
-        const normalized: Course = {
-          ...data,
-          image: data.image ? mediaUrl(data.image) : null,
-        };
+        // === NEW: параллельно грузим словарь языков, чтобы к моменту рендера он уже был ===
+        const [data, langDict] = await Promise.all([
+          loadCourseByIdOrSlug(raw),
+          loadLanguagesDict().catch(() => ({})),
+        ]);
+
+        if (!cancelled && langDict) setLanguagesMap(langDict);
+
+        const normalized: Course = { ...data, image: data.image ? mediaUrl(data.image) : null };
         if (!cancelled) {
           setCourse(normalized);
-          // коментарі
           await loadComments(normalized.id);
+
+          // check wishlist
+          try {
+            const w = await http.get('/courses/me/wishlist/');
+            const items: WishlistItem[] = Array.isArray(w.data?.results) ? w.data.results : w.data || [];
+            const exists = items.some((it) => it?.course?.id === normalized.id);
+            setIsFav(exists);
+          } catch {
+            // ignore wishlist error
+          }
         }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Не вдалося завантажити курс');
@@ -130,11 +186,64 @@ export default function CourseDetailPage() {
     };
   }, [raw]);
 
-  // ----- comments actions
+  // === NEW: функция извлечения красивого отображения языка ===
+  function extractLanguageLabel(lang: Course['language']): string {
+    if (lang == null) return '—';
+
+    // Если объект: берем name > title > code > slug > id
+    if (typeof lang === 'object') {
+      const obj = lang as any;
+      return (
+        obj.name ||
+        obj.title ||
+        obj.code ||
+        obj.slug ||
+        (typeof obj.id === 'number' ? languagesMap[obj.id] || `#${obj.id}` : '—')
+      ) as string;
+    }
+
+    // Если число: ищем в словаре языков
+    if (typeof lang === 'number') {
+      return languagesMap[lang] || `#${lang}`;
+    }
+
+    // Если строка: возможно это уже имя или код; если это число в строке — попробуем словарь
+    const asNum = Number(lang);
+    if (!Number.isNaN(asNum) && String(asNum) === String(lang)) {
+      return languagesMap[asNum] || `#${asNum}`;
+    }
+    return lang; // уже человекочитаемое значение
+  }
+
+  // === NEW: мемоизированная "красивая" метка языка ===
+  const languageLabel = useMemo(() => extractLanguageLabel(course?.language), [course?.language, languagesMap]);
+
+  // --- wishlist toggle ---
+  async function toggleFavorite() {
+    if (!course) return;
+    if (!me) {
+      return alert('Щоб керувати обраним — увійдіть у профіль.');
+    }
+    try {
+      setAddingFav(true);
+      if (isFav) {
+        await http.delete(`/courses/me/wishlist/${course.id}/`);
+        setIsFav(false);
+      } else {
+        await http.post('/courses/me/wishlist/', { course_id: course.id });
+        setIsFav(true);
+      }
+    } catch (e: any) {
+      alert(e?.response?.data?.detail || 'Не вдалося оновити обране');
+    } finally {
+      setAddingFav(false);
+    }
+  }
+
+  // --- comments actions ---
   async function saveComment() {
     if (!course) return;
     if (!commentText.trim()) return alert('Введіть текст коментаря');
-
     try {
       if (editId) {
         await http.put(`/courses/${course.id}/comments/${editId}/`, { text: commentText });
@@ -171,131 +280,214 @@ export default function CourseDetailPage() {
 
   return (
     <>
-      <main className="container">
-        <h1 className="title">{course.title}</h1>
+      <main className="page">
+        <div className="card">
+          <h1 className="title">{course.title}</h1>
 
-        {!!course.image && (
-          <div className="image-wrapper">
-            <img src={String(course.image)} alt={course.title} />
+          {!!course.image && (
+            <div className="image">
+              <img src={String(course.image)} alt={course.title} />
+            </div>
+          )}
+
+          <p className="lead">
+            Якщо вам подобається creating visually appealing designs, using advanced design software
+            та співпраця з іншими креаторами — ця спеціальність вам підійде.
+          </p>
+
+          <div className="infoRow">
+            <div className="pill">
+              <span className="pillLabel">Автор:</span>
+              <span className="pillValue">
+                {course.author_username || (typeof course.author === 'object' ? course.author?.username : '—')}
+              </span>
+            </div>
+            <div className="pill">
+              <span className="pillLabel">Мова:</span>
+              {/* === NEW: показываем красивое имя языка === */}
+              <span className="pillValue">{languageLabel || '—'}</span>
+            </div>
+            <div className="pill">
+              <span className="pillLabel">Тема:</span>
+              <span className="pillValue">{course.topic || '—'}</span>
+            </div>
           </div>
-        )}
 
-        <div className="info">
-          <p className="description">{course.description}</p>
-          <ul className="details-list">
-            <li><strong>Автор:</strong> {course.author_username || (typeof course.author === 'object' ? course.author?.username : '—')}</li>
-            {course.language && <li><strong>Мова:</strong> {course.language}</li>}
-            {course.topic && <li><strong>Тема:</strong> {course.topic}</li>}
-            {course.price != null && <li><strong>Ціна:</strong> ${Number(course.price).toFixed(2)}</li>}
-            {course.rating != null && <li><strong>Рейтинг:</strong> {Number(course.rating).toFixed(2)}</li>}
-          </ul>
+          {course.price != null && (
+            <div className="pricePill">
+              <span className="pillLabel">Ціна:</span>
+              <span className="pillValue">${Number(course.price).toFixed(2)}</span>
+            </div>
+          )}
 
-          <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {canEditCourse && (
-              <>
-                <Link href={`/courses/${course.id}/edit`} className="btn btn-edit-course">✏️ Редагувати</Link>
-                <Link href={`/courses/${course.id}/delete`} className="btn btn-delete-course">🗑️ Видалити</Link>
-                <Link href="/lessons/create" className="btn btn-add-lesson">+ Додати урок</Link>
-              </>
+          {/* actions */}
+          <div className="actions">
+            <Link href={`/checkout/${course.id}`} className="payBtn">Перейти до оформлення</Link>
+
+            <button
+              onClick={toggleFavorite}
+              className="favBtn"
+              disabled={addingFav}
+              title={isFav ? 'Прибрати з обраного' : 'Додати в обране'}
+              aria-pressed={isFav}
+            >
+              {addingFav ? 'Оновлюємо…' : isFav ? '✓ В обраному' : 'Додати в обране'}
+            </button>
+          </div>
+
+          {/* comments */}
+          <div className="commentsWrap">
+            <div className="commentsTitle">Коментарі</div>
+
+            {me ? (
+              <div className="commentForm">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  rows={6}
+                  placeholder="Напишіть коментар"
+                />
+                <div className="commentActions">
+                  <button onClick={saveComment} className="blueBtn">{editId ? 'Оновити' : 'Додати'}</button>
+                  {editId && (
+                    <button onClick={() => { setEditId(null); setCommentText(''); }} className="grayBtn">
+                      Скасувати
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="loginHint">
+                Щоб додати коментар — <Link href="/login" className="loginLink">Увійдіть</Link>.
+              </p>
             )}
-            <Link href={`/checkout/${course.id}`} className="inline-block px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-              💳 Перейти до оформлення
-            </Link>
+
+            {loadingComments ? (
+              <p>Завантаження коментарів…</p>
+            ) : comments.length === 0 ? (
+              <p>Коментарів поки немає.</p>
+            ) : (
+              <ul className="commentsList">
+                {comments.map((c) => {
+                  const can = !!me && (me.is_superuser || me.username?.toLowerCase() === c.author_username.toLowerCase());
+                  return (
+                    <li key={c.id} className="commentItem">
+                      <div className="commentHead">
+                        <strong>{c.author_username}</strong>
+                        <span className="commentDate">{new Date(c.created_at).toLocaleString()}</span>
+                      </div>
+                      <p className="commentBody">{c.text}</p>
+                      {can && (
+                        <div className="commentBtns">
+                          <button
+                            className="miniBtn edit"
+                            onClick={() => { setEditId(c.id); setCommentText(c.text); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          >
+                            ✏️ Редагувати
+                          </button>
+                          <button className="miniBtn del" onClick={() => deleteComment(c.id)}>🗑️ Видалити</button>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
-
-        <section className="comments-section">
-          <h2>Коментарі</h2>
-
-          {me ? (
-            <div className="comment-form">
-              <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                rows={4}
-                placeholder="Напишіть коментар"
-              />
-              <div style={{ marginTop: '0.5rem' }}>
-                <button onClick={saveComment} className="btn-submit">
-                  {editId ? 'Оновити' : 'Додати'}
-                </button>
-                {editId && (
-                  <button onClick={() => { setEditId(null); setCommentText(''); }} className="btn-cancel">
-                    Скасувати
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <p>Щоб додати коментар — <Link href="/login" className="login-link">Увійдіть</Link>.</p>
-          )}
-
-          {loadingComments ? (
-            <p>Завантаження коментарів…</p>
-          ) : comments.length === 0 ? (
-            <p>Коментарів поки немає.</p>
-          ) : (
-            <ul className="comments-list">
-              {comments.map((c) => {
-                const can = !!me && (me.is_superuser || me.username?.toLowerCase() === c.author_username.toLowerCase());
-                return (
-                  <li key={c.id} className="comment-item">
-                    <div className="comment-header">
-                      <strong>{c.author_username}</strong>
-                      <span className="comment-date">{new Date(c.created_at).toLocaleString()}</span>
-                    </div>
-                    <p className="comment-content">{c.text}</p>
-                    {can && (
-                      <div className="comment-actions">
-                        <button className="btn-edit" onClick={() => { setEditId(c.id); setCommentText(c.text); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>✏️ Редагувати</button>
-                        <button className="btn-delete" onClick={() => deleteComment(c.id)}>🗑️ Видалити</button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
       </main>
 
       <style jsx>{`
-        .container {
-          max-width: 860px;
-          margin: 3rem auto;
-          padding: 2rem 2.5rem;
-          background-color: #f0f4f8;
-          border-radius: 20px;
-          box-shadow: 0 8px 20px rgba(100, 100, 150, 0.1), 0 4px 10px rgba(100, 100, 150, 0.05);
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-          color: #334155;
+        .page {
+          min-height: 100dvh;
+          padding: 40px 20px 56px;
+          background: linear-gradient(180deg, #e8f2ff 0%, #e9f1ff 55%, #eef5ff 100%);
         }
-        .title { font-size: 2.8rem; font-weight: 700; color: #3b82f6; margin-bottom: 1.5rem; text-align: center; }
-        .image-wrapper { width: 100%; max-height: 360px; overflow: hidden; border-radius: 18px; margin-bottom: 2rem; background: white; display:flex; align-items:center; justify-content:center; }
-        .image-wrapper img { max-width:100%; max-height:100%; object-fit:contain; }
-        .info { font-size: 1.1rem; line-height: 1.6; }
-        .description { margin-bottom: 1.6rem; color: #475569; }
-        .details-list { list-style: none; padding: 0; display:grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 10px 16px; }
-        .details-list li { background:white; padding:0.8rem 1.2rem; border-radius:12px; box-shadow:0 2px 8px rgba(59,130,246,0.1); }
-        .comments-section { margin-top: 2.2rem; }
-        .comments-section h2 { font-size: 1.8rem; margin-bottom: 0.8rem; color:#2563eb; border-bottom:2px solid #2563eb; padding-bottom:4px; }
-        .comment-form textarea { width:100%; border-radius:10px; border:1px solid #94a3b8; padding:0.8rem 1rem; font-size:1rem; resize:vertical; }
-        .btn-submit, .btn-cancel { padding: 0.5rem 1rem; margin-right: 0.5rem; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; font-size: 1rem; }
-        .btn-submit { background:#2563eb; color:#fff; } .btn-submit:hover{ background:#1e40af; }
-        .btn-cancel { background:#9ca3af; color:#fff; } .btn-cancel:hover{ background:#6b7280; }
-        .login-link { color:#2563eb; font-weight:600; text-decoration:underline; }
-        .comments-list { list-style:none; padding:0; margin-top:1rem; display:flex; flex-direction:column; gap:1rem; }
-        .comment-item { position:relative; padding:1.25rem; background:#f8fafc; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.05); padding-top:3.2rem; }
-        .comment-header { display:flex; justify-content:space-between; color:#334155; font-weight:600; }
-        .comment-date { color:#94a3b8; font-weight:400; }
-        .comment-actions { position:absolute; top:0.6rem; right:0.6rem; display:flex; gap:0.4rem; }
-        .btn-edit, .btn-delete { padding:6px 12px; border-radius:6px; font-weight:600; border:1.5px solid transparent; cursor:pointer; }
-        .btn-edit { background:#fbbf24; color:#92400e; border-color:#fbbf24; } .btn-edit:hover{ background:#f59e0b; color:#fff; }
-        .btn-delete { background:#ef4444; color:#fff; border-color:#ef4444; } .btn-delete:hover{ background:#dc2626; }
-        .btn { display:inline-block; padding:0.5rem 1.2rem; border-radius:8px; font-weight:700; text-decoration:none; }
-        .btn-edit-course { background:#fbbf24; color:#92400e; border:1.5px solid #fbbf24; }
-        .btn-delete-course { background:#ef4444; color:#fff; border:1.5px solid #ef4444; }
-        .btn-add-lesson { background:#3b82f6; color:#fff; border:1.5px solid #3b82f6; }
+        .card {
+          max-width: 1140px;
+          margin: 0 auto;
+          background: #cfe0ff4d;
+          border-radius: 20px;
+          padding: 28px 28px 32px;
+          box-shadow: 0 10px 30px rgba(59, 130, 246, 0.14);
+          border: 1px solid rgba(59, 130, 246, 0.28);
+        }
+        .title {
+          font-weight: 800;
+          font-size: 34px;
+          line-height: 1.2;
+          text-align: center;
+          color: #0f172a;
+          margin-bottom: 20px;
+        }
+        .image {
+          background: #e8d6ff;
+          border-radius: 16px;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 22px;
+          width: 100%;
+          max-height: 420px;
+        }
+        .image img { width: 100%; height: auto; object-fit: contain; }
+        .lead { color: #374151; font-size: 16px; line-height: 1.7; margin: 10px 0 18px; }
+        .infoRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+        .pill { background: #ffffff; border-radius: 12px; padding: 14px 18px; font-size: 16px; box-shadow: 0 3px 10px rgba(0,0,0,0.06); }
+        .pillLabel { color: #0f172a; font-weight: 800; margin-right: 8px; }
+        .pillValue { color: #111827; font-weight: 600; }
+        .pricePill {
+          display: inline-flex; background: #ffffff; border-radius: 12px; padding: 14px 18px; font-size: 16px;
+          box-shadow: 0 3px 10px rgba(0,0,0,0.06); margin: 2px 0 22px;
+        }
+        .actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 22px; }
+        .payBtn {
+          display: inline-block; padding: 10px 18px; background: #16a34a; color: #fff; border-radius: 10px;
+          font-weight: 800; font-size: 16px; box-shadow: 0 6px 14px rgba(22,163,74,0.28);
+        }
+        .payBtn:hover { background: #15803d; }
+
+        /* wishlist button */
+        .favBtn {
+          display: inline-flex; align-items: center; gap: 10px;
+          padding: 10px 14px; border-radius: 10px;
+          border: 1px solid #CBD5E1;
+          background: #EEF2FF; color: #1f2a44; font-weight: 800; font-size: 16px;
+          box-shadow: 0 3px 8px rgba(31, 41, 255, 0.08);
+        }
+        .favBtn:hover { background: #E0E7FF; }
+        .favBtn[aria-pressed="true"] {
+          background: #E5E7EB; color: #0f172a; border-color: #cbd5e1;
+        }
+        .favBtn:disabled { opacity: .75; cursor: not-allowed; }
+
+        .commentsWrap { margin-top: 8px; }
+        .commentsTitle { font-size: 18px; font-weight: 800; color: #0f172a; padding-bottom: 8px; border-bottom: 3px solid #2563eb; margin-bottom: 12px; }
+        .commentForm textarea {
+          width: 100%; border-radius: 12px; border: 1px solid #a5b4fc; background: #fff; padding: 14px 16px; font-size: 16px; resize: vertical; min-height: 140px;
+        }
+        .commentActions { margin-top: 12px; display: flex; gap: 10px; }
+        .blueBtn, .grayBtn { padding: 12px 20px; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 16px; }
+        .blueBtn { background: #2563eb; color: #fff; } .blueBtn:hover { background: #1e40af; }
+        .grayBtn { background: #9ca3af; color: #fff; } .grayBtn:hover { background: #6b7280; }
+        .loginHint { color: #374151; font-size: 15px; }
+        .loginLink { color: #2563eb; text-decoration: underline; font-weight: 800; }
+        .commentsList { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 14px; }
+        .commentItem { background: #ffffff; border: 1px solid rgba(2, 6, 23, 0.06); border-radius: 14px; padding: 14px 16px; box-shadow: 0 3px 10px rgba(0,0,0,0.05); }
+        .commentHead { display: flex; justify-content: space-between; color: #0f172a; font-size: 15px; }
+        .commentDate { color: #6b7280; font-size: 13px; }
+        .commentBody { margin: 8px 0 10px; color: #111827; font-size: 15px; }
+        .commentBtns { display: flex; gap: 10px; }
+        .miniBtn { padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; border: none; color: #fff; }
+        .miniBtn.edit { background: #f59e0b; } .miniBtn.edit:hover { background: #d97706; }
+        .miniBtn.del { background: #ef4444; } .miniBtn.del:hover { background: #dc2626; }
+
+        @media (max-width: 980px) {
+          .card { padding: 22px 18px 26px; }
+          .infoRow { grid-template-columns: 1fr; }
+          .payBtn { margin-left: 0; }
+        }
       `}</style>
     </>
   );

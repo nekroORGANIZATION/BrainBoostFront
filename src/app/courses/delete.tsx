@@ -10,14 +10,14 @@ export default function CourseDeletePage() {
   const [courseTitle, setCourseTitle] = useState('');
 
   useEffect(() => {
-    axios.get(`http://172.17.10.22:8000/courses/${id}/`)
+    axios.get(`https://brainboost.pp.ua/api/courses/${id}/`)
       .then(res => setCourseTitle(res.data.title))
       .catch(err => console.error(err));
   }, [id]);
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`hhttp://172.17.10.22:8000/courses/${id}/delete/`, {
+      await axios.delete(`https://brainboost.pp.ua/api/courses/${id}/delete/`, {
         withCredentials: true,
       });
       router.push('/courses');

@@ -4,22 +4,58 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 
+interface Lesson {
+  id: number;
+  title: string;
+  description: string;
+}
+
 export default function LessonsPage() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Функція для діставання токена з localStorage або sessionStorage
+  const getToken = (): string | null => {
+    return (
+      localStorage.getItem('access') ||
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('access') ||
+      sessionStorage.getItem('accessToken') ||
+      null
+    );
+  };
+
   useEffect(() => {
-    axios.get('http://172.17.10.22:8000/api/lesson/lessons/')
-      .then((res) => {
-        setLessons(res.data.results || []); // берем только results
-        setLoading(false);
-      })
-      .catch((err) => {
+    const token = getToken();
+    if (!token) {
+      setError('Користувач не авторизований');
+      setLoading(false);
+      return;
+    }
+
+    const fetchLessons = async () => {
+      try {
+        // Оновлений URL для GET списку уроків
+        const res = await axios.get('https://brainboost.pp.ua/api/api/lesson/admin/lessons/', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setLessons(res.data.results || []);
+      } catch (err: any) {
         console.error(err);
-        setError('Ошибка загрузки уроков');
+        if (err.response?.status === 401) {
+          setError('Неавторизований. Будь ласка, увійдіть у систему.');
+        } else if (err.response?.status === 405) {
+          setError('Метод не дозволений. Перевірте URL запиту.');
+        } else {
+          setError('Помилка завантаження уроків');
+        }
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchLessons();
   }, []);
 
   if (loading) return <div className="text-center mt-10">Загрузка...</div>;
@@ -38,7 +74,6 @@ export default function LessonsPage() {
           <li key={lesson.id} className="border p-4 rounded">
             <h2 className="text-xl font-semibold">{lesson.title}</h2>
             <p>{lesson.description}</p>
-
             <div className="mt-2">
               <Link
                 href={`/lessons/${lesson.id}/details`}
@@ -47,7 +82,6 @@ export default function LessonsPage() {
                 Деталі
               </Link>
             </div>
-
           </li>
         ))}
       </ul>

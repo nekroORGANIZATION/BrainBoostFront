@@ -13,7 +13,7 @@ export default function CreateLessonPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-        const response = await axios.post('http://172.17.10.22:8000/api/lesson/lessons/', {
+        const response = await axios.post('https://brainboost.pp.ua/api/api/lesson/lessons/', {
             title,
             description,
             course,

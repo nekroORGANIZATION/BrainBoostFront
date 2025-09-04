@@ -72,28 +72,28 @@ jobs:
             ssh-keyscan -p "$PORT" -H "${{ secrets.MAIN_TARGET_HOST }}" >> ~/.ssh/known_hosts || true
             chmod 644 ~/.ssh/known_hosts || true
           fi
-
       - name: Deploy via SSH
         shell: bash
         run: |
-          set -euo pipefail
-          KEYFILE="${{ runner.temp }}/main_ssh_key"
-          PORT="$(cat "${{ runner.temp }}/ssh_port")"
+              set -euo pipefail
+              KEYFILE="${{ runner.temp }}/main_ssh_key"
+              PORT="${{ secrets.MAIN_SSH_PORT }}"
+              [ -z "$PORT" ] && PORT=22
 
-          ssh -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
-            "GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_READ_TOKEN='${{ secrets.GHCR_READ_TOKEN }}' NGINX_SERVICE='${{ env.NGINX_SERVICE }}' bash -s" << 'EOSH'
+              ssh -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
+              "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
+              GHCR_USER='${{ secrets.GHCR_USER }}' \
+              GHCR_READ_TOKEN='${{ secrets.GHCR_READ_TOKEN }}' \
+              NGINX_SERVICE='${{ env.NGINX_SERVICE }}' \
+              bash -s <<'EOF'
               set -euo pipefail
               cd /opt/myapp
-              # логин в GHCR для docker pull (если нужно)
-              if [ -n "${GHCR_USER:-}" ] && [ -n "${GHCR_READ_TOKEN:-}" ]; then
-                echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
+              
+              if [[ -n "${GHCR_USER:-}" && -n "${GHCR_READ_TOKEN:-}" ]]; then
+              echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
               fi
+
               docker compose pull "$NGINX_SERVICE"
               docker compose up -d "$NGINX_SERVICE"
               docker image prune -f
-            EOSH
-      - name: Cleanup SSH key
-        if: always()
-        run: |
-          rm -f "${{ runner.temp }}/main_ssh_key"
+              EOF

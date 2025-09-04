@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -69,7 +70,9 @@ export default function TeacherLessonsPage() {
       .get('/accounts/api/profile/')
       .then((r) => !cancelled && setMe(r.data as Profile))
       .catch(() => !cancelled && setMe(null));
-    return () => { cancelled = true; };
+    return (
+  <Suspense>
+) => { cancelled = true; };
   }, []);
 
   // load my lessons — НОВЫЙ URL: /api/lesson/lessons/mine/
@@ -391,5 +394,7 @@ export default function TeacherLessonsPage() {
         }
       `}</style>
     </div>
-  );
+  )>
+</Suspense>
+);
 }

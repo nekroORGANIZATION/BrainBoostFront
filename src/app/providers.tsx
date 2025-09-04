@@ -1,17 +1,14 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { SSRProvider } from "react-aria";
-import { Provider as RACProvider } from "react-aria-components";
-import { NextUIProvider } from "@nextui-org/react";
-import { useRouter } from "next/navigation";
+import {SSRProvider} from 'react-aria';
+import {Provider as RACProvider} from 'react-aria-components';
+import {NextUIProvider} from '@nextui-org/react';
 
-export default function Providers({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+export default function Providers({children}: {children: React.ReactNode}) {
   return (
     <SSRProvider>
       <RACProvider>
-        <NextUIProvider navigate={router.push}>
+        <NextUIProvider>
           {children}
         </NextUIProvider>
       </RACProvider>

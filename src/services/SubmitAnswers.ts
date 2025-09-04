@@ -17,7 +17,7 @@ export const submitAnswers = async (
       answers
     });
     return response.data;
-  } catch (error: unknown) {
+  } catch (error) {
     console.error('Ошибка при отправке ответов:', error);
     throw error;
   }

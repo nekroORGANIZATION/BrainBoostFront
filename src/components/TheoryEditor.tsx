@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef as _useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Extension } from '@tiptap/core';
@@ -233,8 +233,8 @@ const TheoryEditor: React.FC<TheoryEditorProps> = ({ initialContent, onSave }) =
         ].map(align => (
           <button
             key={align.value}
-            onClick={() => editor.chain().focus().setTextAlign(align.value as any).run()}
-            className={editor.isActive({ textAlign: align.value as any }) ? 'bg-gray-300 px-2 rounded' : 'px-2 rounded'}
+            onClick={() => editor.chain().focus().setTextAlign(align.value as unknown).run()}
+            className={editor.isActive({ textAlign: align.value as unknown }) ? 'bg-gray-300 px-2 rounded' : 'px-2 rounded'}
             type="button"
           >
             {align.label}

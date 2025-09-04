@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef as _useRef, useState } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
@@ -80,7 +80,6 @@ export default function CreateCoursePage() {
       if (!s || s === slugify(s)) return generated;
       return s; // користувач уже щось писав — не чіпаємо
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title]);
 
   /* ---------------- image handlers ---------------- */
@@ -181,7 +180,7 @@ export default function CreateCoursePage() {
       // редірект на деталі (через slug якщо повернувся)
       const to = created.slug ? `/courses/${created.slug}` : `/courses/${created.id}/details`;
       router.push(to);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error creating course:', err?.response?.data || err);
       const detail =
         err?.response?.data?.detail ||
@@ -352,7 +351,7 @@ export default function CreateCoursePage() {
                 <select
                   value={String(categoryId)}
                   onChange={(e) => {
-                    const v = e.target.value === '' ? '' : (e.target.value as any);
+                    const v = e.target.value === '' ? '' : (e.target.value as unknown);
                     setCategoryId(v === 'new' ? 'new' : v === '' ? '' : Number(v));
                   }}
                   className="mt-1 w-full rounded-xl ring-1 ring-violet-200 px-3 py-2 outline-none focus:ring-violet-500"

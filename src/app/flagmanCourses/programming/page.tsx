@@ -689,7 +689,7 @@ function CTASection() {
         }),
       });
       if (res.ok) { setStatus({ type: 'success', message: 'Дякуємо! Ми зв’яжемось із вами найближчим часом.' }); setForm({ name: '', email: '', phone: '' }); }
-      else { const data = await res.json().catch(() => ({})); setStatus({ type: 'error', message: 'Помилка відправки: ' + ((data as any)?.error || res.status) }); }
+      else { const data = await res.json().catch(() => ({})); setStatus({ type: 'error', message: 'Помилка відправки: ' + ((data as unknown)?.error || res.status) }); }
     } catch { setStatus({ type: 'error', message: 'Помилка з’єднання з сервером. Спробуйте ще раз.' }); }
     finally { setLoading(false); }
   };

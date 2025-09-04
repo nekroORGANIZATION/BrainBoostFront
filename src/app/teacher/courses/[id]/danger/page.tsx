@@ -15,7 +15,7 @@ export default function DangerTab({ params }: { params: { id: string } }) {
       await http.delete(DELETE_URL(id));
       alert('Курс видалено.');
       router.push('/teacher/courses');
-    } catch (e:any) {
+    } catch (e) {
       alert(e?.response?.data ? JSON.stringify(e.response.data) : 'Не вдалося видалити');
     }
   }

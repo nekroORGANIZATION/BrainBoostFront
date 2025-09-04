@@ -59,7 +59,6 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
     setAge(a);
     setFormattedDate(`${d} ${monthsUA[m - 1]} ${y} р.`);
     updateData({ birthDate: `${y}-${pad2(m)}-${pad2(d)}` });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [day, month, year, monthsUA]);
 
   const validateAll = () => {
@@ -97,7 +96,7 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
 
       // інакше ведемо на логін із позначкою успіху
       router.push('/login?registered=1');
-    } catch (e: any) {
+    } catch (e) {
       // намагаємось витягнути меседж із axios response
       const msg =
         e?.response?.data?.detail ||

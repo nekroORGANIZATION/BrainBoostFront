@@ -22,7 +22,7 @@ export default function TipOfDayCard({ className = '' }: Props) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data: Tip = await r.json();
       setTip(data);
-    } catch (e: unknown) {
+    } catch (e) {
       const msg = e instanceof Error ? e.message : 'Помилка завантаження';
       setErr(msg);
     } finally {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef as _useRef, useState } from 'react';
 import Link from 'next/link';
 import http, { API_BASE } from '@/lib/http';
 
@@ -49,7 +49,7 @@ function mapImages(items?: { id: number; image: string }[]) {
 /* =========================
    Утіліти
 ========================= */
-function safeArr<T = any>(raw: any): T[] {
+function safeArr<T = any>(raw): T[] {
   if (Array.isArray(raw)) return raw as T[];
   if (raw && Array.isArray(raw.results)) return raw.results as T[];
   return [];
@@ -218,7 +218,7 @@ export default function AdminReviewsPage() {
           const clist = safeArr<Course>(c.data);
           if (!cancelled) setCourses(clist);
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) setErr(e.message || 'Не вдалося завантажити дані');
       } finally {
         if (!cancelled) setLoading(false);
@@ -396,7 +396,7 @@ export default function AdminReviewsPage() {
               <select
                 value={status}
                 onChange={(e) => {
-                  setStatus(e.target.value as any);
+                  setStatus(e.target.value as unknown);
                   setPage(1);
                 }}
                 className="w-full h-10 rounded-[10px] ring-1 ring-[#E5ECFF] px-3 outline-none bg-white focus:ring-[#1345DE]"
@@ -413,7 +413,7 @@ export default function AdminReviewsPage() {
                 value={String(courseId)}
                 onChange={(e) => {
                   const v = e.target.value === 'all' ? 'all' : Number(e.target.value);
-                  setCourseId(v as any);
+                  setCourseId(v as unknown);
                   setPage(1);
                 }}
                 className="w-full h-10 rounded-[10px] ring-1 ring-[#E5ECFF] px-3 outline-none bg-white focus:ring-[#1345DE]"
@@ -430,7 +430,7 @@ export default function AdminReviewsPage() {
             <div className="col-span-6 lg:col-span-2">
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value as any)}
+                onChange={(e) => setSort(e.target.value as unknown)}
                 className="w-full h-10 rounded-[10px] ring-1 ring-[#E5ECFF] px-3 outline-none bg-white focus:ring-[#1345DE]"
               >
                 <option value="new">Спочатку нові</option>
@@ -625,7 +625,7 @@ export default function AdminReviewsPage() {
                     await moderateOne(reasonOpen.id, 'rejected', reasonText || '(reason not provided)');
                     setReasonText('');
                     setReasonOpen(null);
-                  } catch (e: any) {
+                  } catch (e) {
                     alert(e.message);
                   }
                 }}
@@ -654,7 +654,7 @@ export default function AdminReviewsPage() {
                 onClick={async () => {
                   try {
                     await bulkDelete(confirmDelete.ids);
-                  } catch (e: any) {
+                  } catch (e) {
                     alert(e.message);
                   }
                 }}

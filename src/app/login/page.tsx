@@ -67,7 +67,7 @@ export default function LoginPage() {
 
       // 4) редірект
       router.push('/profile');
-    } catch (err: any) {
+    } catch (err) {
       const msg =
         err?.response?.data?.detail ||
         err?.response?.data?.error ||

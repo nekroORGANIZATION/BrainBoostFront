@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef as _useRef } from 'react';
 import { useParams, useRouter } from "next/navigation";
 
 interface Choice {

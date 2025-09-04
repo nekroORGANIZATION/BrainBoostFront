@@ -76,7 +76,7 @@ export default function TestPage() {
       .catch(() => setError('Не вдалося стартувати спробу'));
   }, [test, attemptId, token]);
 
-  const handleAnswerChange = (questionId: number, value: any, multiple = false) => {
+  const handleAnswerChange = (questionId: number, value, multiple = false) => {
     if (multiple) {
       setUserAnswers(prev => {
         const prevArr = Array.isArray(prev[questionId]) ? prev[questionId] : [];
@@ -143,7 +143,7 @@ export default function TestPage() {
 
         if (res.data.breakdown) {
           const detMap: Record<number, Detail> = {};
-          res.data.breakdown.forEach((d: any) => {
+          res.data.breakdown.forEach((d) => {
             detMap[d.question] = { is_correct: d.is_correct };
           });
           setDetails(detMap);

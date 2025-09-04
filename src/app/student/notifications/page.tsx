@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef as _useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -42,7 +42,7 @@ function fmtTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-function isPaginated<T>(x: any): x is Paginated<T> {
+function isPaginated<T>(x): x is Paginated<T> {
   return x && typeof x === 'object' && Array.isArray(x.results);
 }
 async function collectAll<T>(firstUrl: string, headers?: HeadersInit): Promise<T[]> {
@@ -76,12 +76,12 @@ async function collectAll<T>(firstUrl: string, headers?: HeadersInit): Promise<T
 function useChatId(): number | null {
   const params = useParams();
   const raw =
-    (params as any).chatId ??
-    (params as any).ChatId ??
-    (params as any).id ??
-    (params as any).Id ??
-    (params as any).chat ??
-    (params as any).Chat ??
+    (params as unknown).chatId ??
+    (params as unknown).ChatId ??
+    (params as unknown).id ??
+    (params as unknown).Id ??
+    (params as unknown).chat ??
+    (params as unknown).Chat ??
     null;
   const num = typeof raw === 'string' ? Number(raw) : Array.isArray(raw) ? Number(raw[0]) : Number(raw);
   return Number.isFinite(num) && num > 0 ? num : null;
@@ -118,7 +118,7 @@ export default function StudentChatThreadPage() {
 
   useEffect(() => {
     let cancelled = false;
-    let pollTimer: any = null;
+    let pollTimer = null;
 
     async function loadThread() {
       if (!isAuthenticated || !accessToken || !chatId) {
@@ -144,7 +144,7 @@ export default function StudentChatThreadPage() {
             body: JSON.stringify({ chat: chatId, last_read_message_id: lastId }),
           }).catch(() => {});
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) setErr(e?.message || 'Помилка завантаження.');
       } finally {
         if (!cancelled) setLoading(false);

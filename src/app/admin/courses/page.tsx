@@ -106,7 +106,7 @@ export default function AdminCoursesPage() {
         if (!cancelled) {
           setCourses(list);
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) setError(e?.message || 'Не вдалося завантажити курси');
       } finally {
         if (!cancelled) setLoading(false);
@@ -198,7 +198,7 @@ export default function AdminCoursesPage() {
               />
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as unknown)}
                 className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF]"
               >
                 <option value="all">Усі статуси</option>

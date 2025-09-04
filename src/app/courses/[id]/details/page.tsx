@@ -80,7 +80,7 @@ export default function CourseDetailPage() {
         const r4 = await fetch(`${API_BASE}/courses/?page_size=200`, { cache: 'no-store' });
         const j = await r4.json();
         const arr: Course[] = Array.isArray(j) ? j : j?.results || [];
-        const found = arr.find((c) => (c as any).slug === idOrSlug);
+        const found = arr.find((c) => (c as unknown).slug === idOrSlug);
         if (!found) throw new Error('Курс не знайдено.');
         return found;
       }
@@ -175,7 +175,7 @@ export default function CourseDetailPage() {
             // ignore wishlist error
           }
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) setErr(e?.message || 'Не вдалося завантажити курс');
       } finally {
         if (!cancelled) setLoading(false);
@@ -192,7 +192,7 @@ export default function CourseDetailPage() {
 
     // Если объект: берем name > title > code > slug > id
     if (typeof lang === 'object') {
-      const obj = lang as any;
+      const obj = lang as unknown;
       return (
         obj.name ||
         obj.title ||
@@ -233,7 +233,7 @@ export default function CourseDetailPage() {
         await http.post('/courses/me/wishlist/', { course_id: course.id });
         setIsFav(true);
       }
-    } catch (e: any) {
+    } catch (e) {
       alert(e?.response?.data?.detail || 'Не вдалося оновити обране');
     } finally {
       setAddingFav(false);

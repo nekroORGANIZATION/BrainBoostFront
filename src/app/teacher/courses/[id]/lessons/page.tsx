@@ -29,7 +29,7 @@ export default function LessonEditPage() {
       try {
         const r = await http.get(`/courses/${id}/lessons/${lessonId}/`);
         if (!cancel) setForm(r.data);
-      } catch (e: any) {
+      } catch (e) {
         if (!cancel) setErr(e?.message || 'Не вдалося завантажити урок');
       } finally {
         if (!cancel) setLoading(false);
@@ -71,7 +71,7 @@ export default function LessonEditPage() {
         headers: { 'Content-Type': 'application/json' },
       });
       alert('Збережено ✅');
-    } catch (e: any) {
+    } catch (e) {
       setErr(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка збереження');
     } finally {
       setSaving(false);

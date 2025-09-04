@@ -1,7 +1,7 @@
 // src/context/AuthContext.tsx
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState as _useState } from 'react';
 import axios from 'axios';
 import http, { API_BASE, ME_URL, LOGIN_URL } from '@/lib/http';
 import { setAuthHeader } from '@/lib/http';

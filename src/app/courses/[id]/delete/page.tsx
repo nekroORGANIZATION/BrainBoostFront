@@ -66,7 +66,7 @@ export default function CourseDeletePage() {
         } else {
           // 2) by-slug або фолбек
           // Спершу пробуємо canonical by-slug:
-          let c: any = null;
+          let c = null;
           const resp = await fetch(`${API_BASE}/courses/by-slug/${encodeURIComponent(idParam)}/`, { cache: 'no-store' });
           if (resp.ok) {
             c = await resp.json();
@@ -75,7 +75,7 @@ export default function CourseDeletePage() {
             const listResp = await fetch(`${API_BASE}/courses/?page_size=200`, { cache: 'no-store' });
             const list = await listResp.json();
             const arr = Array.isArray(list) ? list : (list?.results || []);
-            c = arr.find((it: any) => it.slug === idParam) || null;
+            c = arr.find((it) => it.slug === idParam) || null;
             if (!c) throw new Error('No Course matches the given query.');
           }
 
@@ -91,7 +91,7 @@ export default function CourseDeletePage() {
           };
           if (!cancelled) setCourse(normalized);
         }
-      } catch (e: any) {
+      } catch (e) {
         if (!cancelled) setErr(e?.message || 'Не вдалося завантажити курс.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -99,7 +99,6 @@ export default function CourseDeletePage() {
     }
     load();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idParam]);
 
   /* --------- deletion with fallbacks --------- */
@@ -130,7 +129,7 @@ export default function CourseDeletePage() {
       ];
 
       let ok = false;
-      let lastErr: any = null;
+      let lastErr = null;
       for (const url of urlsToTry) {
         try {
           ok = await tryDelete(url);
@@ -145,7 +144,7 @@ export default function CourseDeletePage() {
 
       // назад до списку
       router.push('/courses');
-    } catch (e: any) {
+    } catch (e) {
       // показати більш дружнє повідомлення
       const msg = e?.response?.data?.detail
         || e?.response?.data?.error

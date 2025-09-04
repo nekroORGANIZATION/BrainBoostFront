@@ -106,7 +106,6 @@ export default function TeacherLessonsPage() {
       });
 
     updateUrl();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, ordering, status, currentPage]);
 
   const fmt = (iso?: string) => (iso ? new Date(iso).toLocaleString() : '—');

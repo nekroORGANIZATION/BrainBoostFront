@@ -31,7 +31,7 @@ export default function StudentsPage() {
       setLoading(true); setErr(null);
 
       // Послідовність спроб, щоб підлаштуватись під бек
-      let data =
+      const data =
         (await softLoad(`/courses/${id}/students/`)) ||
         (await softLoad(`/courses/${id}/enrollments/`)) ||
         (await softLoad(`/courses/${id}/purchases/`));
@@ -44,7 +44,7 @@ export default function StudentsPage() {
       }
 
       // Нормалізація
-      const normalized: Row[] = data.map((x: any) => ({
+      const normalized: Row[] = data.map((x) => ({
         id: x.id || x.user?.id,
         username: x.username || x.user?.username || x.user_name,
         email: x.email || x.user?.email,

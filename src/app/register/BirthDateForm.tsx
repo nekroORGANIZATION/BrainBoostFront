@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { RegisterFormData } from './page';
 import { useAuth } from '@/context/AuthContext';
-import { registerUser } from '@/lib/api';
+import { register } from '@/services/AuthService';
 
 type Props = {
   onBack: () => void;
@@ -80,7 +80,7 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
     setError(null);
     setBusy(true);
     try {
-      const res = await registerUser(
+      const res = await register(
         values.role as 'student' | 'teacher',
         values.name,
         values.email,

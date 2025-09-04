@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import http from '@/lib/http';
-import { mediaUrl, isAbsUrl } from '@/lib/api';
+import { mediaUrl, isAbsUrl } from '@/lib/media';
 
 /** ---- API endpoints (бек працює по SLUG) ---- */
 const READ_BY_SLUG   = (slug: string) => `/courses/${slug}/`;

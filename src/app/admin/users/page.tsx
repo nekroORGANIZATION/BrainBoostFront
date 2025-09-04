@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
-// ===== Types =====
+/** ===================== Types ===================== */
 type User = {
   id: number;
   username: string;
@@ -17,8 +17,22 @@ type User = {
   date_joined?: string;
 };
 
-// ===== UI small =====
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+type AuthShape = {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  user?: { username?: string; is_superuser?: boolean } | null;
+};
+
+type BadgeTone = 'slate' | 'emerald' | 'rose' | 'amber';
+
+/** ===================== UI small ===================== */
+function Card({
+  children,
+  className = '',
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
       {children}
@@ -26,14 +40,24 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-function Badge({ children, tone = 'slate' as 'slate'|'emerald'|'rose'|'amber' }) {
-  const map: Record<string, string> = {
+function Badge({
+  children,
+  tone = 'slate',
+}: {
+  children: React.ReactNode;
+  tone?: BadgeTone;
+}) {
+  const map: Record<BadgeTone, string> = {
     slate: 'bg-slate-100 text-slate-700',
     emerald: 'bg-emerald-100 text-emerald-700',
     rose: 'bg-rose-100 text-rose-700',
     amber: 'bg-amber-100 text-amber-800',
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[tone]}`}>{children}</span>;
+  return (
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[tone]}`}>
+      {children}
+    </span>
+  );
 }
 
 function SkeletonRow() {
@@ -49,13 +73,9 @@ function SkeletonRow() {
   );
 }
 
-// ===== Page =====
+/** ===================== Page ===================== */
 export default function AdminUsersPage() {
-  const { isAuthenticated, user, accessToken } = useAuth() as {
-    isAuthenticated: boolean;
-    accessToken: string | null;
-    user?: { username?: string; is_superuser?: boolean } | null;
-  };
+  const { isAuthenticated, user, accessToken } = useAuth() as AuthShape;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,26 +102,32 @@ export default function AdminUsersPage() {
       setLoading(true);
       setError(null);
       try {
-        const headers: HeadersInit = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
-        // Спершу пробуємо адмінський ендпоінт з пагінацією
+        const headers: HeadersInit = {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        };
+
+        // 1) Адмінський ендпоінт з пагінацією
         const url = new URL(`${API_BASE}/admin_panel/api/users/all/`);
         url.searchParams.set('page', String(page));
         url.searchParams.set('page_size', String(pageSize));
         const res = await fetch(url.toString(), { headers, cache: 'no-store' });
 
         if (res.ok) {
-          const raw = await res.json();
-          const list: User[] = Array.isArray(raw) ? raw : raw.results || [];
+          // очікуємо або { results, count } або масив
+          const raw: unknown = await res.json();
+          const list = Array.isArray(raw) ? (raw as User[]) : ((raw as { results?: User[] }).results ?? []);
           if (!cancelled) {
             setUsers(list);
-            setCount(typeof raw?.count === 'number' ? raw.count : list.length);
+            const maybeCount = (raw as { count?: number }).count;
+            setCount(typeof maybeCount === 'number' ? maybeCount : list.length);
           }
         } else {
-          // fallback: звичайний список без пагінації
+          // 2) Фолбек: публічний список
           const res2 = await fetch(`${API_BASE}/api/users/`, { headers, cache: 'no-store' });
           if (res2.ok) {
-            const raw = await res2.json();
-            const list: User[] = Array.isArray(raw) ? raw : raw.results || [];
+            const raw2: unknown = await res2.json();
+            const list = Array.isArray(raw2) ? (raw2 as User[]) : ((raw2 as { results?: User[] }).results ?? []);
             if (!cancelled) {
               setUsers(list);
               setCount(list.length);
@@ -110,22 +136,31 @@ export default function AdminUsersPage() {
             throw new Error(`HTTP ${res.status}`);
           }
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Не вдалося завантажити користувачів');
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Не вдалося завантажити користувачів';
+        if (!cancelled) setError(message);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken, notLoggedIn, notAdmin, page]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     let list = users;
-    if (ql) list = list.filter(u => (u.username || '').toLowerCase().includes(ql) || (u.email || '').toLowerCase().includes(ql));
-    if (onlyTeachers) list = list.filter(u => !!u.is_teacher);
+    if (ql) {
+      list = list.filter(
+        (u) =>
+          (u.username || '').toLowerCase().includes(ql) ||
+          (u.email || '').toLowerCase().includes(ql),
+      );
+    }
+    if (onlyTeachers) list = list.filter((u) => !!u.is_teacher);
     return list;
   }, [users, q, onlyTeachers]);
 
@@ -167,7 +202,11 @@ export default function AdminUsersPage() {
                 className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF] focus:outline-none"
               />
               <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={onlyTeachers} onChange={(e) => { setOnlyTeachers(e.target.checked); setPage(1); }} />
+                <input
+                  type="checkbox"
+                  checked={onlyTeachers}
+                  onChange={(e) => { setOnlyTeachers(e.target.checked); setPage(1); }}
+                />
                 Лише викладачі
               </label>
             </div>
@@ -216,7 +255,9 @@ export default function AdminUsersPage() {
                           <Badge tone="amber">Очікує підтвердження</Badge>
                         )}
                       </td>
-                      <td className="py-3 text-slate-500">{u.date_joined ? new Date(u.date_joined).toLocaleDateString('uk-UA') : '—'}</td>
+                      <td className="py-3 text-slate-500">
+                        {u.date_joined ? new Date(u.date_joined).toLocaleDateString('uk-UA') : '—'}
+                      </td>
                     </tr>
                   ))
                 ) : (
@@ -238,13 +279,19 @@ export default function AdminUsersPage() {
                 className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >Назад</button>
-              <div className="px-2 py-1 text-sm text-slate-600">{page} / {totalPages}</div>
+              >
+                Назад
+              </button>
+              <div className="px-2 py-1 text-sm text-slate-600">
+                {page} / {totalPages}
+              </div>
               <button
                 className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-              >Далі</button>
+              >
+                Далі
+              </button>
             </div>
           </div>
 
@@ -252,9 +299,7 @@ export default function AdminUsersPage() {
             <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">← Повернутись назад</Link>
           </div>
 
-          {error ? (
-            <div className="mt-4 text-red-600 text-sm">{error}</div>
-          ) : null}
+          {error ? <div className="mt-4 text-red-600 text-sm">{error}</div> : null}
         </Card>
       </section>
     </main>

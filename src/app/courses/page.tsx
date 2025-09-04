@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import http from '@/lib/http';
-import { mediaUrl } from '@/lib/api';
+import { mediaUrl } from '@/lib/media';
 
 type Course = {
   id: number;

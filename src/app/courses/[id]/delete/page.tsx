@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import http from '@/lib/http';
-import { mediaUrl, isAbsUrl } from '@/lib/api';
+import { mediaUrl, isAbsUrl } from '@/lib/media';
 import { API_BASE } from '@/lib/http';
 import { useAuth } from '@/context/AuthContext';
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import http from '@/lib/http';
-import { mediaUrl, isAbsUrl } from '@/lib/api';
+import { mediaUrl, isAbsUrl } from '@/lib/media';
 import { API_BASE } from '@/lib/http';
 
 type Category = { id: number; name: string; slug?: string };

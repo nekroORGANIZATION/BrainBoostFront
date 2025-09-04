@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import http, { ME_URL } from '@/lib/http';
-import { mediaUrl } from '@/lib/api';
+import { mediaUrl } from '@/lib/media';
 
 /* ===== API endpoints ===== */
 const PURCHASED_URL = '/courses/me/purchased/';

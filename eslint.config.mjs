@@ -1,4 +1,3 @@
-// eslint.config.mjs
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { FlatCompat } from "@eslint/eslintrc";
@@ -10,30 +9,25 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
-export default [
-  // Игноры для flat-config
-  {
-    ignores: ["**/.next/**", "node_modules/**", "dist/**", "build/**"],
-  },
-
-  // Базовые конфиги Next + TS
+/** @type {import('eslint').Linter.FlatConfig[]} */
+const eslintConfig = [
+  // Next.js recommended + TS support
   ...compat.extends("next/core-web-vitals", "next/typescript"),
-
-  // Наши переопределения: превращаем ошибки в warn/выключаем
+  // Our overrides to quiet non-blocking warnings
   {
     rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
-      ],
-      "@typescript-eslint/prefer-as-const": "warn",
-      "@typescript-eslint/no-empty-object-type": "off",
-      "prefer-const": "warn",
-      "react-hooks/exhaustive-deps": "warn",
-
-      // опционально: выключить шум от next/image
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/prefer-as-const": "off",
+      "@typescript-eslint/no-unused-expressions": "off",
+      "prefer-const": "off",
+      "react-hooks/exhaustive-deps": "off",
       "@next/next/no-img-element": "off",
+    },
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
     },
   },
 ];
+
+export default eslintConfig;

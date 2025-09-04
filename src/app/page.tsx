@@ -21,45 +21,6 @@ function FixedImg({
 }) {
   const [err, setErr] = React.useState(false);
   const s = src && !err ? src : '/images/placeholder.png';
-
-const founders = [
-  {
-    name: "Альона Мельник",
-    title: "CEO",
-    image: "/images/founder1.png",
-    quote:
-      "«Змінювати країну — це процес, у якому кожен крок важливий: нові знання та можливості, вищий рівень життя».",
-    instagram: "#",
-    linkedin: "#",
-  },
-  {
-    name: "Павло Гончар",
-    title: "CGO",
-    image: "/images/founder2.png",
-    quote:
-      "«Випускники Brainboost відкривають бізнеси, працюють у топових компаніях, формують нову інтелектуальну еліту».",
-    instagram: "#",
-    linkedin: "#",
-  },
-  {
-    name: "Сергій Ткаченко",
-    title: "CSO",
-    image: "/images/founder3.png",
-    quote:
-      "«Найбільше мотивує бачити, як люди змінюють своє життя на краще. Читаю відгуки наших студентів — і всі вони надихають».",
-    instagram: "#",
-    linkedin: "#",
-  },
-];
-
-const imageGrid = [
-  "/images/hero1.png",
-  "/images/hero2.png",
-  "/images/hero3.png",
-  "/images/hero4.png",
-];
-
-export default function Home() {
   return (
     <img
       src={s}

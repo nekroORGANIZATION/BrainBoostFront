@@ -50,7 +50,7 @@ function useDebounced<T>(value: T, ms = 400) {
   return v;
 }
 
-function pickPayload(payload): unknown[] {
+function pickPayload(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
   if (payload?.results && Array.isArray(payload.results)) return payload.results;
   if (payload?.data && Array.isArray(payload.data)) return payload.data;
@@ -71,7 +71,7 @@ function normalizeNum(n: number | string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function mapRowToReview(row): Review {
+function mapRowToReview(row: any): Review {
   const r = row?.review ?? row;
 
   const course =
@@ -89,7 +89,7 @@ function mapRowToReview(row): Review {
   // media: рядок/масив/undefined → масив абсолютних URL
   let media: string[] | null = null;
   if (Array.isArray(r?.media)) {
-    media = r.media.map((m) => toAbs(String(m))).filter(Boolean) as string[];
+    media = r.media.map((m: any) => toAbs(String(m))).filter(Boolean) as string[];
   } else if (r?.media) {
     media = [toAbs(String(r.media))!].filter(Boolean);
   }
@@ -149,7 +149,7 @@ export default function MyReviewsPage() {
       let res;
       try {
         res = await http.get(REVIEWS_URL);
-      } catch (e) {
+      } catch (e: any) {
         if (e?.response?.status === 404) {
           res = await http.get(REVIEWS_URL_FALLBACK);
         } else {
@@ -159,7 +159,7 @@ export default function MyReviewsPage() {
       const raw = pickPayload(res.data);
       const mapped = raw.map(mapRowToReview);
       setReviews(mapped);
-    } catch (e) {
+    } catch (e: any) {
       setError(
         e?.response?.status === 401
           ? 'Потрібна авторизація для перегляду відгуків.'

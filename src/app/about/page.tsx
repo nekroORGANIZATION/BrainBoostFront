@@ -365,7 +365,7 @@ function FbIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
 }
 
 /* Instagram */
-export function IgIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
+function IgIcon({ size = 20, className = 'text-[#1345DE]', title }: IconProps) {
   return (
     <svg
       viewBox="0 0 24 24"

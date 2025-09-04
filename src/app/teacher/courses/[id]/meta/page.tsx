@@ -64,7 +64,7 @@ export default function MetaPage({ params }: { params: { id: string } }) {
               : '',
         });
         setCurrentImage(data.image || null);
-      } catch (e) {
+      } catch (e: any) {
         setErr(e?.message || 'Не вдалося завантажити курс');
       } finally {
         if (!c) setLoading(false);
@@ -117,7 +117,7 @@ export default function MetaPage({ params }: { params: { id: string } }) {
       });
       if (file && preview) setCurrentImage(preview);
       alert('Збережено ✅');
-    } catch (e) {
+    } catch (e: any) {
       setErr(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка збереження');
     } finally {
       setSaving(false);

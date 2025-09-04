@@ -240,7 +240,7 @@ export default function ContactsPage() {
         const data = await res.json().catch(() => ({}));
         setStatus({
           type: 'error',
-          message: 'Помилка відправки: ' + ((data as unknown)?.error || res.status),
+          message: 'Помилка відправки: ' + ((data as any)?.error || res.status),
         });
       }
     } catch {

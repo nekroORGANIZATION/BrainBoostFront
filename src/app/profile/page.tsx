@@ -131,7 +131,7 @@ export default function ProfilePage() {
           ? pc.data
           : pc.data?.results || pc.data?.data || pc.data?.items || [];
 
-        const mapped: Course[] = rawList.map((row) => {
+        const mapped: Course[] = rawList.map((row: any) => {
           const c = row?.course ?? row;
           return {
             id: c?.id,
@@ -146,7 +146,7 @@ export default function ProfilePage() {
         });
 
         if (!cancelled) setCourses(mapped);
-      } catch (e) {
+      } catch (e: any) {
         if (!cancelled) {
           // показуємо мʼяку помилку (401/403/інші)
           const msg =
@@ -199,7 +199,7 @@ export default function ProfilePage() {
       });
       setProfile(res.data);
       setEditMode(false);
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.response?.data ? JSON.stringify(e.response.data) : 'Не вдалося оновити профіль.');
     } finally {
       setSaving(false);

@@ -66,7 +66,7 @@ export default function CertificatesPage() {
       }
       const data: ApiCompletedCoursesResponse = await res.json();
       setItems(Array.isArray(data) ? data : data.results || []);
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || 'Помилка завантаження.');
     } finally {
       setLoading(false);
@@ -98,7 +98,7 @@ export default function CertificatesPage() {
       }
       setInfo('Сертифікат надіслано на вашу пошту.');
       await load();
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || 'Помилка.');
     } finally {
       setPosting(null);

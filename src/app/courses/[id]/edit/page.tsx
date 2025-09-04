@@ -146,7 +146,7 @@ export default function CourseEditPage() {
           });
           setCurrentImage(data.image || null);
         }
-      } catch (e) {
+      } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Не вдалося завантажити курс');
       } finally {
         if (!cancelled) setLoading(false);
@@ -218,7 +218,7 @@ export default function CourseEditPage() {
       { method: 'put', url: `/courses/${idParam}/` },
     ];
 
-    let lastErr = null;
+    let lastErr: any = null;
 
     for (const step of attempts) {
       try {
@@ -229,7 +229,7 @@ export default function CourseEditPage() {
         console.warn(`[edit] Success at ${step.method.toUpperCase()} ${step.url}`);
         router.push('/courses');
         return;
-      } catch (e) {
+      } catch (e: any) {
         lastErr = e;
         const st = e?.response?.status;
         console.warn(`[edit] Failed ${step.method.toUpperCase()} ${step.url} (${st || 'no-status'})`);

@@ -51,7 +51,7 @@ function toBackendType(t: LessonDraft['type']) {
 }
 
 function buildLessonPayload(courseId: number, l: LessonDraft) {
-  const p = {
+  const p: any = {
     course: courseId,
     title: (l.title || '').trim(),
     type: toBackendType(l.type),
@@ -97,7 +97,7 @@ export default function CourseBuilderPage() {
         const arr = Array.isArray(r.data?.results) ? r.data.results : r.data;
         if (!cancelled) setCategories(arr || []);
         console.log('[CourseBuilder] categories:', arr);
-      } catch (e) {
+      } catch (e: any) {
         console.error('[CourseBuilder] categories error:', e?.response?.status, e?.response?.data || e);
         // 401 не чиним специально
       }
@@ -134,7 +134,7 @@ export default function CourseBuilderPage() {
       if (!raw) return;
       const saved: CourseDraft = JSON.parse(raw);
       // ВАЖНО: не тащим старые id/slug, чтобы не попасть на /courses/15/
-      const { id: _dropId, slug: _dropSlug, ...rest } = saved as unknown;
+      const { id: _dropId, slug: _dropSlug, ...rest } = saved as any;
       setDraft((d) => ({ ...d, ...rest, id: undefined, slug: null, image_file: null }));
       console.log('[CourseBuilder] draft restored (id/slug ignored)');
     } catch (e) {
@@ -250,7 +250,7 @@ export default function CourseBuilderPage() {
       setDraft(d => ({ ...d, id: created.id, slug: created.slug ?? null, image_url: created.image ?? d.image_url, status: 'draft' }));
       console.log('[CourseBuilder] Draft created id=', created.id);
       setStep(2);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[CourseBuilder] goToLessons error:', {
         status: e?.response?.status, data: e?.response?.data, url: e?.config?.url, method: e?.config?.method,
       });
@@ -287,7 +287,7 @@ export default function CourseBuilderPage() {
 
       setMsg('Курс опубліковано! 🎉');
       // опционально: localStorage.removeItem(DRAFT_KEY);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[CourseBuilder] publishCourse error:', {
         status: e?.response?.status, data: e?.response?.data, url: e?.config?.url, method: e?.config?.method,
       });
@@ -398,6 +398,7 @@ export default function CourseBuilderPage() {
                   />
                   <div className="mt-2 rounded-lg overflow-hidden bg-white ring-1 ring-[#E5ECFF] grid place-items-center aspect-[4/3]">
                     {imagePreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={imagePreview} alt="cover" className="max-h-full object-contain" />
                     ) : (
                       <div className="text-slate-500 text-sm">Превʼю</div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useMemo as _useMemo, useState as _useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 type Prefs = {
   textScale: number;                   // 0.8..1.6 (умножитель на базовый 16px)

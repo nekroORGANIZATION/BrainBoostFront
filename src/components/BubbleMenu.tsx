@@ -1,5 +1,5 @@
 // BubbleMenu.tsx
-import React, { useEffect, useState, useRef as _useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 
 interface BubbleMenuProps {

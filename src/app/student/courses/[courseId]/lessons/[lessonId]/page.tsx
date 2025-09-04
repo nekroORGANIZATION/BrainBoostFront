@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef as _useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -106,7 +106,7 @@ export default function LessonTheoryPage() {
         if (resTheory.status === 'fulfilled' && resTheory.value.ok) {
           const data = (await resTheory.value.json()) as LessonTheory;
           setLesson(data);
-          const tId = (data as unknown)?.theory_id ?? (data as unknown)?.content_id ?? (data as unknown)?.id ?? null;
+          const tId = (data as any)?.theory_id ?? (data as any)?.content_id ?? (data as any)?.id ?? null;
           setTheoryId(typeof tId === 'number' ? tId : null);
         } else {
           setLesson(null);
@@ -118,8 +118,8 @@ export default function LessonTheoryPage() {
           let tId: number | null = null;
           let tName = 'Викладач';
           if (data?.author && typeof data.author === 'object') {
-            tId = (data.author as unknown).id ?? null;
-            tName = (data.author as unknown).full_name || (data.author as unknown).username || tName;
+            tId = (data.author as any).id ?? null;
+            tName = (data.author as any).full_name || (data.author as any).username || tName;
           } else if (typeof data?.author === 'number') {
             tId = data.author;
           } else if (data?.author_username) {
@@ -160,7 +160,7 @@ export default function LessonTheoryPage() {
         body: JSON.stringify({ lesson_id: lessonId, question: text }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({} as unknown));
+        const err = await res.json().catch(() => ({} as any));
         const msg = err?.error || err?.detail || 'Помилка з боку ШІ.';
         setAiMsgs((p) => [...p, { role: 'assistant', text: `❌ ${msg}`, ts: now() }]);
         return;

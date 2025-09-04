@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo as _useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -38,7 +38,7 @@ function Badge({ children, tone = 'amber' as 'amber'|'emerald'|'rose'|'slate' })
 }
 
 export default function AdminTeacherApplicationsPage() {
-  const { isAuthenticated, user, accessToken } = useAuth() as unknown;
+  const { isAuthenticated, user, accessToken } = useAuth() as any;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [apps, setApps] = useState<TeacherApplication[]>([]);
@@ -102,7 +102,7 @@ export default function AdminTeacherApplicationsPage() {
               <p className="text-slate-600 text-sm">Перевіряйте документи та підтверджуйте профілі викладачів</p>
             </div>
             <div className="flex items-center gap-2">
-              <select value={filter} onChange={(e) => setFilter(e.target.value as unknown)} className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF]">
+              <select value={filter} onChange={(e) => setFilter(e.target.value as any)} className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF]">
                 <option value="pending">В очікуванні</option>
                 <option value="approved">Підтверджені</option>
                 <option value="rejected">Відхилені</option>

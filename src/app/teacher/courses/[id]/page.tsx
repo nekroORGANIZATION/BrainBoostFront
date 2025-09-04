@@ -23,7 +23,7 @@ export default function SyllabusPage() {
       const r = await http.get(`/courses/${id}/syllabus/`);
       const arr: Section[] = Array.isArray(r.data?.results) ? r.data.results : r.data || [];
       setList(arr);
-    } catch (e) {
+    } catch (e: any) {
       setErr(e?.message || 'Не вдалося завантажити програму');
     } finally {
       setLoading(false);
@@ -38,7 +38,7 @@ export default function SyllabusPage() {
       await http.post(`/courses/${id}/sections/`, { title: newSection.trim() });
       setNewSection('');
       await load();
-    } catch (e) {
+    } catch (e: any) {
       alert(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка створення розділу');
     }
   }
@@ -66,7 +66,7 @@ export default function SyllabusPage() {
       const lessonId = r.data?.id;
       if (lessonId) window.location.href = `/teacher/courses/${id}/lessons/${lessonId}`;
       else await load();
-    } catch (e) {
+    } catch (e: any) {
       alert(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка створення уроку');
     }
   }

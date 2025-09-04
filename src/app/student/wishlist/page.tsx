@@ -49,7 +49,7 @@ export default function WishlistPage() {
       }
       const data = await safeJson(res);
       setItems(Array.isArray(data) ? data : data.results || []);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       setError(e.message || 'Помилка завантаження');
     } finally {
@@ -112,6 +112,7 @@ export default function WishlistPage() {
                 <Link href={`/courses/${course.id}`}>
                   <div className="aspect-video bg-slate-100 overflow-hidden">
                     {course.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={course.image}
                         alt={course.title}

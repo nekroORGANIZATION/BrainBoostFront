@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef as _useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import http, { API_BASE } from '@/lib/http';
 
@@ -92,7 +92,7 @@ type PurchaseApi = {
 /* =========================================================
    Хелпери
 ========================================================= */
-const safeGetArray = <T,>(raw): T[] =>
+const safeGetArray = <T,>(raw: any): T[] =>
   Array.isArray(raw) ? raw as T[] : (raw?.results && Array.isArray(raw.results) ? (raw.results as T[]) : []);
 
 const ytToEmbed = (url: string) =>
@@ -156,7 +156,7 @@ export default function ReviewsPage() {
       if (res.status < 200 || res.status >= 300) return [];
       const arr = safeGetArray<PurchaseApi>(res.data);
       const out = arr.map((p) => {
-        const c = p.course as unknown;
+        const c = p.course as any;
         if (!c) return null;
         if (typeof c === 'number') return { id: c, title: `Курс #${c}` } as CourseApi;
         return { id: Number(c.id), title: String(c.title || `Курс #${c.id}`) } as CourseApi;
@@ -192,7 +192,7 @@ export default function ReviewsPage() {
       myPurchases.forEach((c) => cmap.set(c.id, c.title));
 
       setReviews(revData.map((r) => toUI(r, cmap.get(r.course))));
-    } catch (e) {
+    } catch (e: any) {
       setErr(e?.message || 'Помилка завантаження');
     } finally {
       setLoading(false);
@@ -231,11 +231,9 @@ export default function ReviewsPage() {
 
     if (onlyWithMedia) list = list.filter((r) => (r.images && r.images.length > 0) || !!r.video);
 
-    if (sort === 'new') {
-      list.sort((a, b) => +new Date(b.date) - +new Date(a.date));
-    } else {
-      list.sort((a, b) => b.rating - a.rating);
-    }
+    (sort === 'new'
+      ? list.sort((a, b) => +new Date(b.date) - +new Date(a.date))
+      : list.sort((a, b) => b.rating - a.rating));
 
     return list;
   }, [reviews, cat, query, onlyWithMedia, sort]);
@@ -270,7 +268,7 @@ export default function ReviewsPage() {
 
     try {
       setCreating(true);
-      const res = await http.post('/api/reviews/create/', {
+      const res: any = await http.post('/api/reviews/create/', {
         course: form.courseId,
         rating: form.rating,
         text: form.text,
@@ -289,7 +287,7 @@ export default function ReviewsPage() {
       setOpenModal(false);
       setForm({ courseId: 0, rating: 5, text: '', video_url: '', consent: false });
       await loadAll();
-    } catch (e) {
+    } catch (e: any) {
       alert(e?.message || 'Сталася помилка під час надсилання');
     } finally {
       setCreating(false);
@@ -400,7 +398,7 @@ export default function ReviewsPage() {
                   onChange={(e) => {
                     const v = e.target.value === 'all' ? 'all' : Number(e.target.value);
                     setPage(1);
-                    setCat(v as unknown);
+                    setCat(v as any);
                   }}
                   className={INPUT}
                 >
@@ -409,7 +407,7 @@ export default function ReviewsPage() {
                   ))}
                 </select>
 
-                <select value={sort} onChange={(e) => setSort(e.target.value as unknown)} className={INPUT}>
+                <select value={sort} onChange={(e) => setSort(e.target.value as any)} className={INPUT}>
                   <option value="new">Спочатку нові</option>
                   <option value="top">Найвищий рейтинг</option>
                 </select>

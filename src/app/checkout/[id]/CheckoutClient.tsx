@@ -13,7 +13,7 @@ const PLANS = [
   { id: 'mentor', title: 'Mentor', features: ['Все з Pro', '1:1 менторинг', 'Допомога з працевлаштуванням'] },
 ] as const;
 
-const CURRENCY = 'USD' as const;
+const CURRENCY: 'USD' = 'USD';
 
 type CourseLike = {
   id?: number | string;
@@ -45,7 +45,7 @@ export default function CheckoutClient({ courseId }: Props) {
         // приклад: /courses/<id>/
         const res = await http.get(`/courses/${courseId}/`);
         if (!cancelled) setCourse(res.data as CourseLike);
-      } catch (e) {
+      } catch (e: any) {
         if (!cancelled)
           setStatus({
             type: 'err',
@@ -105,14 +105,14 @@ export default function CheckoutClient({ courseId }: Props) {
       const approvalUrl =
         data?.approval_url ||
         (Array.isArray(data?.links)
-          ? data.links.find((l) => /approve|payer-action/i.test(l?.rel))?.href
+          ? data.links.find((l: any) => /approve|payer-action/i.test(l?.rel))?.href
           : null);
 
       if (!approvalUrl) {
         throw new Error('Не отримали approval URL від PayPal.');
       }
       window.location.href = approvalUrl;
-    } catch (e) {
+    } catch (e: any) {
       setStatus({
         type: 'err',
         msg:
@@ -141,7 +141,7 @@ export default function CheckoutClient({ courseId }: Props) {
         throw new Error('Не отримали hosted_url від Coinbase.');
       }
       window.location.href = data.hosted_url as string;
-    } catch (e) {
+    } catch (e: any) {
       setStatus({
         type: 'err',
         msg:

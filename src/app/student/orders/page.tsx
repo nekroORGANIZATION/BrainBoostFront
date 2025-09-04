@@ -20,16 +20,16 @@ type PurchaseUI = { id: string; course: Course; status?: string; createdAt?: str
 
 const isAbs = (u?: string) => !!u && (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:'));
 const murl = (u?: string) => (!u ? '' : isAbs(u) ? u : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`);
-const getData = <T,>(resp): T => (resp && ('data' in resp ? resp.data : resp)) as T;
-const safeGetArray = <T,>(raw): T[] => (Array.isArray(raw) ? raw : raw?.results ?? []) as T[];
-const toNumber = (n): number | undefined => (Number.isFinite(+n) ? +n : undefined);
+const getData = <T,>(resp: any): T => (resp && ('data' in resp ? resp.data : resp)) as T;
+const safeGetArray = <T,>(raw: any): T[] => (Array.isArray(raw) ? raw : raw?.results ?? []) as T[];
+const toNumber = (n: any): number | undefined => (Number.isFinite(+n) ? +n : undefined);
 
 function normalizeOne(p: PurchaseRaw): PurchaseUI | null {
   if ('title' in p && 'id' in p) {
     const c = p as Course;
-    return { id: String(c.id), course: c, status: 'completed', amount: toNumber((c as unknown).price) };
+    return { id: String(c.id), course: c, status: 'completed', amount: toNumber((c as any).price) };
   }
-  const r = p;
+  const r: any = p;
   const c: Course | null =
     typeof r.course === 'object'
       ? r.course
@@ -141,11 +141,11 @@ export default function PurchasesPage() {
         setItems(arr); setCount(arr.length); setNextUrl(null); setPrevUrl(null);
       } else {
         const arr = safeGetArray<PurchaseRaw>(data).map(normalizeOne).filter(Boolean) as PurchaseUI[];
-        setItems(arr); setCount((data as unknown).count ?? arr.length);
-        setNextUrl((data as unknown).next ?? null); setPrevUrl((data as unknown).previous ?? null);
+        setItems(arr); setCount((data as any).count ?? arr.length);
+        setNextUrl((data as any).next ?? null); setPrevUrl((data as any).previous ?? null);
       }
       setCurrentUrl(url);
-    } catch (e) {
+    } catch (e: any) {
       const msg = e?.response?.status === 401 ? 'Щоб переглянути історію, увійдіть до акаунту.' : e?.message || 'Не вдалося завантажити покупки';
       setErr(msg); setItems([]); setCount(0); setNextUrl(null); setPrevUrl(null);
     } finally { setLoading(false); }
@@ -188,7 +188,7 @@ export default function PurchasesPage() {
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as unknown)}
+              onChange={(e) => setStatus(e.target.value as any)}
               className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2.5 outline-none focus:ring-4 focus:ring-indigo-100"
             >
               <option value="all">Усі статуси</option>

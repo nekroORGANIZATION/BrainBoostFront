@@ -1,6 +1,6 @@
 'use client';
 
-import { useState as _useState } from 'react';
+import { useState } from 'react';
 import RoleSelection from '@/app/register/RoleSelection';
 import UserDetailsForm from '@/app/register/UserDetailsForm';
 import BirthDateForm from '@/app/register/BirthDateForm';

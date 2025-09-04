@@ -62,7 +62,7 @@ export default function SettingsA11yPage() {
             <Card title="Міжрядковий інтервал">
               <select
                 value={prefs.lineHeight}
-                onChange={(e) => setPrefs({ lineHeight: e.target.value as unknown })}
+                onChange={(e) => setPrefs({ lineHeight: e.target.value as any })}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100"
               >
                 <option value="normal">Звичайний</option>

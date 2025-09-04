@@ -72,8 +72,8 @@ export default function StoryDetailPage() {
     try {
       setSharing(true);
       const url = typeof window !== 'undefined' ? window.location.href : '';
-      if ((navigator as unknown).share) {
-        await (navigator as unknown).share({ title: story?.title ?? 'Історія', url });
+      if ((navigator as any).share) {
+        await (navigator as any).share({ title: story?.title ?? 'Історія', url });
       } else {
         await navigator.clipboard.writeText(url);
         alert('Посилання скопійовано в буфер обміну');

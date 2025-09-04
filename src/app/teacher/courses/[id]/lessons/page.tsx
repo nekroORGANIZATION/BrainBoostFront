@@ -2,153 +2,175 @@
 
 import { useEffect, useState } from 'react';
 import http from '@/lib/http';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 
-const LIST1 = (courseId: string|number) => `/lessons/?course=${courseId}`;
-const LIST2 = (courseId: string|number) => `/courses/${courseId}/lessons/`;  // фолбек якщо є
-const CREATE = `/lessons/`;
-const ITEM   = (lessonId: number|string) => `/lessons/${lessonId}/`;
+type Lesson = {
+  id: number;
+  title: string;
+  content?: string | null;
+  video_url?: string | null;
+  duration_sec?: number | null;
+  is_preview?: boolean;
+};
 
-type Lesson = { id: number; title: string; content?: string; order?: number };
+export default function LessonEditPage() {
+  const { id, lessonId } = useParams() as { id: string; lessonId: string };
+  const router = useRouter();
 
-async function fetchLessons(courseId: string) {
-  try {
-    const r = await http.get(LIST1(courseId));
-    return Array.isArray(r.data?.results) ? r.data.results : r.data;
-  } catch {
+  const [form, setForm] = useState<Lesson>({ id: Number(lessonId), title: '' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await http.get(`/courses/${id}/lessons/${lessonId}/`);
+        if (!cancel) setForm(r.data);
+      } catch (e: any) {
+        if (!cancel) setErr(e?.message || 'Не вдалося завантажити урок');
+      } finally {
+        if (!cancel) setLoading(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [id, lessonId]);
+
+  // -------- fixed handlers (жодних помилок із "checked") --------
+  function onTextChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const { name, value } = e.currentTarget;
+    setForm(s => ({ ...s, [name]: value } as Lesson));
+  }
+  function onNumberChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { name, value } = e.currentTarget;
+    const num = value === '' ? null : Number(value);
+    setForm(s => ({ ...s, [name]: (Number.isNaN(num) ? null : num) } as Lesson));
+  }
+  function onCheckboxChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const { name, checked } = e.currentTarget;
+    setForm(s => ({ ...s, [name]: checked } as Lesson));
+  }
+
+  async function save() {
+    setErr(null);
+    if (!form.title?.trim()) return setErr('Назва обов’язкова.');
+
     try {
-      const r2 = await http.get(LIST2(courseId));
-      return Array.isArray(r2.data?.results) ? r2.data.results : r2.data;
-    } catch {
-      return [];
+      setSaving(true);
+      const payload = {
+        title: form.title,
+        video_url: form.video_url || null,
+        duration_sec: form.duration_sec ?? null,
+        is_preview: !!form.is_preview,
+        content: form.content ?? '',
+      };
+
+      await http.patch(`/courses/${id}/lessons/${lessonId}/`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+      });
+      alert('Збережено ✅');
+    } catch (e: any) {
+      setErr(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка збереження');
+    } finally {
+      setSaving(false);
     }
   }
-}
 
-export default function LessonsTab({ params }: { params: { id: string } }) {
-  const { id } = params;
-  const [list, setList] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string|null>(null);
-
-  const [editId, setEditId] = useState<number|null>(null);
-  const [form, setForm] = useState({ title: '', content: '', order: '' });
-  const [saving, setSaving] = useState(false);
-
-  async function load() {
-    setLoading(true);
-    setErr(null);
-    const arr = await fetchLessons(id);
-    setList(Array.isArray(arr) ? arr : []);
-    setLoading(false);
-  }
-
-  useEffect(() => { load(); }, [id]);
-
-  function startCreate() {
-    setEditId(null);
-    setForm({ title: '', content: '', order: String((list[list.length-1]?.order || list.length) + 1) });
-  }
-  function startEdit(l: Lesson) {
-    setEditId(l.id);
-    setForm({ title: l.title || '', content: l.content || '', order: String(l.order ?? '') });
-  }
-  function cancel() {
-    setEditId(null);
-    setForm({ title: '', content: '', order: '' });
-  }
-
-  async function submit() {
-    if (!form.title.trim()) return alert('Вкажіть назву уроку.');
-    setSaving(true);
-    try {
-      const payload = {
-        course: Number(id),
-        title: form.title,
-        content: form.content,
-        order: form.order ? Number(form.order) : undefined,
-      };
-      if (editId) {
-        await http.patch(ITEM(editId), payload);
-      } else {
-        await http.post(CREATE, payload);
-      }
-      await load();
-      cancel();
-    } catch (e: any) {
-      alert(e?.response?.data ? JSON.stringify(e.response.data) : 'Помилка збереження');
-    } finally { setSaving(false); }
-  }
-
-  async function remove(lessonId: number) {
+  async function remove() {
     if (!confirm('Видалити урок?')) return;
     try {
-      await http.delete(ITEM(lessonId));
-      await load();
+      await http.delete(`/courses/${id}/lessons/${lessonId}/`);
+      router.push(`/teacher/courses/${id}/syllabus`);
     } catch {
       alert('Не вдалося видалити');
     }
   }
 
+  if (loading) return <p>Завантаження…</p>;
+
   return (
     <div className="grid gap-4">
+      {err && <div className="bg-red-50 text-red-700 ring-1 ring-red-200 px-3 py-2 rounded">{err}</div>}
+
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-extrabold text-[#0F2E64]">Програма курсу</h2>
-        <button onClick={startCreate} className="px-4 py-2 rounded bg-[#1345DE] text-white">+ Додати урок</button>
+        <h2 className="text-[#0F2E64] font-extrabold text-[20px]">Редагування уроку</h2>
+        <div className="flex gap-2">
+          <Link href={`/teacher/courses/${id}/lessons/${lessonId}/materials`} className="px-3 py-2 rounded ring-1 ring-[#E5ECFF]">
+            Матеріали
+          </Link>
+          <Link href={`/teacher/courses/${id}/lessons/${lessonId}/quiz`} className="px-3 py-2 rounded ring-1 ring-[#E5ECFF]">
+            Тест
+          </Link>
+        </div>
       </div>
 
-      {loading ? <p>Завантаження…</p> : (
-        list.length === 0
-          ? <div className="rounded bg-slate-50 ring-1 ring-[#E5ECFF] p-4">Поки немає уроків.</div>
-          : <ul className="divide-y">
-              {list
-                .slice()
-                .sort((a,b)=> (a.order ?? a.id) - (b.order ?? b.id))
-                .map(l => (
-                <li key={l.id} className="py-3 flex items-start gap-3">
-                  <div className="w-10 text-center font-semibold text-slate-600">{l.order ?? '—'}</div>
-                  <div className="flex-1">
-                    <div className="font-semibold">{l.title}</div>
-                    {l.content ? <div className="text-sm text-slate-600 whitespace-pre-line mt-1">{l.content}</div> : null}
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => startEdit(l)} className="px-3 py-1 rounded ring-1 ring-[#E5ECFF]">Редагувати</button>
-                    <button onClick={() => remove(l.id)} className="px-3 py-1 rounded bg-red-500 text-white">Видалити</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-      )}
+      <label className="block">
+        <span className="text-sm text-[#0F2E64]">Назва</span>
+        <input
+          name="title"
+          value={form.title || ''}
+          onChange={onTextChange}
+          className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2"
+        />
+      </label>
 
-      {/* Форма створення/редагування */}
-      {(editId !== null || form.title || form.content) && (
-        <div className="rounded-2xl ring-1 ring-[#E5ECFF] p-4 bg-white">
-          <h3 className="font-semibold mb-3">{editId ? 'Редагувати урок' : 'Новий урок'}</h3>
-          <div className="grid md:grid-cols-4 gap-3">
-            <label className="md:col-span-3 block">
-              <span className="text-sm">Назва</span>
-              <input value={form.title} onChange={e=>setForm(f=>({...f, title:e.target.value}))}
-                className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2" />
-            </label>
-            <label className="block">
-              <span className="text-sm">Порядок</span>
-              <input type="number" min={1} value={form.order}
-                onChange={e=>setForm(f=>({...f, order:e.target.value}))}
-                className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2" />
-            </label>
-          </div>
-          <label className="block mt-3">
-            <span className="text-sm">Зміст</span>
-            <textarea rows={6} value={form.content} onChange={e=>setForm(f=>({...f, content:e.target.value}))}
-              className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2" />
-          </label>
-          <div className="mt-3 flex justify-end gap-2">
-            <button onClick={cancel} className="px-4 py-2 rounded ring-1 ring-[#E5ECFF]">Скасувати</button>
-            <button onClick={submit} disabled={saving} className="px-4 py-2 rounded bg-[#1345DE] text-white disabled:opacity-60">
-              {saving ? 'Збереження…' : (editId ? 'Зберегти' : 'Створити')}
-            </button>
-          </div>
-        </div>
-      )}
+      <div className="grid md:grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm text-[#0F2E64]">Відео URL (YouTube/Vimeo/файл)</span>
+          <input
+            name="video_url"
+            value={form.video_url || ''}
+            onChange={onTextChange}
+            placeholder="https://..."
+            className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2"
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm text-[#0F2E64]">Тривалість, сек</span>
+          <input
+            name="duration_sec"
+            type="number"
+            min={0}
+            value={form.duration_sec ?? ''}
+            onChange={onNumberChange}
+            className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2"
+          />
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-sm text-[#0F2E64]">Контент уроку</span>
+        <textarea
+          name="content"
+          value={form.content || ''}
+          onChange={onTextChange}
+          rows={10}
+          className="w-full rounded ring-1 ring-[#E5ECFF] px-3 py-2"
+          placeholder="Текст/нотатки/markdown…"
+        />
+      </label>
+
+      <label className="inline-flex items-center gap-2">
+        <input
+          type="checkbox"
+          name="is_preview"
+          checked={!!form.is_preview}
+          onChange={onCheckboxChange}
+          className="accent-[#1345DE]"
+        />
+        <span className="text-sm text-slate-700">Зробити урок доступним у прев’ю курсу</span>
+      </label>
+
+      <div className="flex justify-between">
+        <button onClick={remove} className="px-4 py-2 rounded bg-red-50 text-red-700 ring-1 ring-red-200">
+          Видалити урок
+        </button>
+        <button onClick={save} disabled={saving} className="px-5 py-2 rounded bg-[#1345DE] text-white disabled:opacity-60">
+          {saving ? 'Збереження…' : 'Зберегти'}
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,45 +1,49 @@
-// app/layout.tsx  (SERVER component)
-import './globals.css';
-import { Afacad, Mulish } from 'next/font/google';
-import { AuthProvider } from '@/context/AuthContext';
-import { AccessibilityProvider } from '@/context/AccessibilityContext';
-import Navbar from '@/components/Navbar';
+'use client';
 
-const afacad = Afacad({
-  subsets: ['latin', 'cyrillic-ext'],
-  weight: ['600', '700'],
-  variable: '--font-afacad',
-});
+import Link from 'next/link';
+import { usePathname, useParams } from 'next/navigation';
 
-const mulish = Mulish({
-  subsets: ['latin', 'cyrillic', 'cyrillic-ext'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-mulish',
-});
+const tabs = [
+  { slug: '', label: 'Мета-дані' },
+  { slug: 'lessons', label: 'Програма' },
+  { slug: 'publish', label: 'Публікація' },
+  { slug: 'danger', label: 'Небезпечно' },
+];
 
-export const metadata = {
-  title: 'BrainBoost',
-  description: 'Навчальна платформа',
-};
+export default function CourseEditLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const params = useParams() as { id?: string | string[] };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // ✅ НЕ з props, а з useParams()
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id || '';
+  const base = id ? `/teacher/courses/${id}` : '/teacher/courses';
+
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+
   return (
-    // suppressHydrationWarning — чтобы класс/атрибуты, которые навешивает провайдер
-    // (dark/hc/data-motion/шрифты), не давали гидратационных ворнингов
-    <html lang="uk" suppressHydrationWarning>
-      <body
-        className={`${afacad.variable} ${mulish.variable} font-mulish antialiased`}
-        style={{ color: 'black' }}
-      >
-        {/* Глобальные пользовательские настройки отображения */}
-        <AccessibilityProvider>
-          {/* Аутентификация + твой Navbar */}
-          <AuthProvider>
-            <Navbar hideOn={['/login', '/register']} />
-            {children}
-          </AuthProvider>
-        </AccessibilityProvider>
-      </body>
-    </html>
+    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
+      <div className="max-w-5xl mx-auto px-6 pt-24 pb-16">
+        <div className="rounded-2xl bg-white/95 ring-1 ring-[#E5ECFF] shadow-[0_12px_40px_rgba(2,28,78,0.08)]">
+          <div className="px-6 pt-5 pb-3 border-b flex flex-wrap gap-2">
+            {tabs.map((t) => {
+              const href = t.slug ? `${base}/${t.slug}` : base;
+              const active = isActive(href);
+              return (
+                <Link
+                  key={t.slug || 'root'}
+                  href={href}
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold ${
+                    active ? 'bg-[#1345DE] text-white' : 'bg-white ring-1 ring-[#E5ECFF]'
+                  }`}
+                >
+                  {t.label}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="p-6">{children}</div>
+        </div>
+      </div>
+    </main>
   );
 }

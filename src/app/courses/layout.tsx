@@ -1,6 +1,4 @@
-import { Suspense } from "react";
-import React from "react";
-
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={null}>{children}</Suspense>;
+import * as React from "react";
+export default function SectionLayout({ children }: { children: React.ReactNode }) {
+  return <React.Suspense fallback={null}>{children}</React.Suspense>;
 }

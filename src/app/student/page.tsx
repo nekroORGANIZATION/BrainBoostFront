@@ -1,314 +1,155 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import http, { ME_URL } from '@/lib/http';
-import { mediaUrl } from '@/lib/media';
+import { useAuth } from '@/context/AuthContext';
 
-/* ===== API endpoints ===== */
-const PURCHASED_URL = '/courses/me/purchased/';
-const CERTS_URL = '/accounts/certificates/my-completed-courses/';
+const API_BASE = 'https://brainboost.pp.ua/api/courses';
 
-/* ===== Types ===== */
-type ProfileData = {
+type WishlistItem = {
   id: number;
-  username: string;
-  email: string;
-  is_email_verified: boolean;
-  is_teacher: boolean;
-  is_certified_teacher: boolean;
-  is_superuser?: boolean;
-  profile_picture: string | null;
-  first_name: string | null;
-  last_name: string | null;
+  created_at: string;
+  course: {
+    id: number;
+    title: string;
+    image?: string;
+    price?: number;
+    rating?: number;
+  };
 };
 
-type Course = {
-  id: number;
-  slug?: string;
-  title: string;
-  description?: string;
-  image?: string | null;
-  author: number | { id: number; username: string };
-  price?: number | string | null;
-  rating?: number | string | null;
-};
-
-type CompletedCourseItem = {
-  id: number;
-  title: string;
-  certificate_exists: boolean;
-  certificate_serial?: string | null;
-};
-
-/* ===== Helpers ===== */
-function normalizePurchased(payload: any): Course[] {
-  const raw = Array.isArray(payload)
-    ? payload
-    : payload?.results || payload?.data || payload?.items || [];
-
-  return raw.map((row: any) => {
-    const c = row?.course ?? row;
-    return {
-      id: c?.id,
-      slug: c?.slug,
-      title: c?.title ?? '',
-      description: c?.description ?? '',
-      image: c?.image ? mediaUrl(c.image) : null,
-      price: c?.price ?? null,
-      rating: c?.rating ?? null,
-      author: typeof c?.author === 'object' ? c.author?.id : c?.author,
-    };
-  });
+// безопасный парсер ответа
+async function safeJson(res: Response) {
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('application/json')) {
+    return res.json();
+  }
+  const text = await res.text();
+  throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
 }
 
-/* ===== Page ===== */
-export default function StudentHomePage() {
-  const [me, setMe] = useState<ProfileData | null>(null);
-  const [purchased, setPurchased] = useState<Course[]>([]);
-  const [certificates, setCertificates] = useState<CompletedCourseItem[]>([]);
+export default function WishlistPage() {
+  const { accessToken } = useAuth(); // подгоняй под свой AuthContext
+  const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadAll = useCallback(async () => {
+  const fetchWishlist = useCallback(async () => {
+    if (!accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      const [meRes, pcRes, certRes] = await Promise.allSettled([
-        http.get(ME_URL),
-        http.get(PURCHASED_URL),
-        http.get(CERTS_URL),
-      ]);
-
-      if (meRes.status === 'fulfilled') setMe(meRes.value.data as ProfileData);
-
-      if (pcRes.status === 'fulfilled') {
-        setPurchased(normalizePurchased(pcRes.value.data));
+      const res = await fetch(`${API_BASE}/wishlist/`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`GET /wishlist failed: ${res.status} ${res.statusText} — ${text.slice(0,150)}`);
       }
-
-      if (certRes.status === 'fulfilled') {
-        const payload = certRes.value.data;
-        const rows = Array.isArray(payload) ? payload : payload?.results;
-        setCertificates(Array.isArray(rows) ? (rows as CompletedCourseItem[]) : []);
-      }
-
-      if (
-        meRes.status === 'rejected' &&
-        pcRes.status === 'rejected' &&
-        certRes.status === 'rejected'
-      ) {
-        setError('Не вдалося завантажити дані. Спробуйте ще раз.');
-      }
+      const data = await safeJson(res);
+      setItems(Array.isArray(data) ? data : data.results || []);
     } catch (e: any) {
-      setError(e?.message || 'Помилка завантаження');
+      console.error(e);
+      setError(e.message || 'Помилка завантаження');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    fetchWishlist();
+  }, [fetchWishlist]);
 
-  const firstName = useMemo(
-    () => (me?.first_name || me?.username || 'Студент').toString().split(' ')[0],
-    [me]
-  );
+  const removeFromWishlist = async (courseId: number) => {
+    if (!accessToken) return;
+    try {
+      const res = await fetch(`${API_BASE}/wishlist/${courseId}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`DELETE failed: ${res.status} ${text}`);
+      }
+      setItems(prev => prev.filter(x => x.course.id !== courseId));
+    } catch (e) {
+      console.error(e);
+      alert('Не вдалося видалити з обраного');
+    }
+  };
 
-  const purchasedCount = purchased.length;
-  const certificatesCount = certificates.filter((c) => c.certificate_exists).length;
+  if (!accessToken) {
+    return (
+      <div className="max-w-5xl mx-auto p-6">
+        <h1 className="text-2xl font-bold mb-2">Wishlist</h1>
+        <p>Увійдіть, щоб переглянути обрані курси.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* welcome */}
-      <section
-        className="rounded-3xl p-6 md:p-8 shadow-2xl"
-        style={{ background: 'linear-gradient(to right, royalblue, mediumslateblue)', color: 'white' }}
-      >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold">Привіт, {firstName}! 👋</h1>
-            <p className="mt-2 opacity-90">Огляд навчання: останні курси, прогрес і швидкі дії.</p>
-            <div className="mt-4 flex gap-3">
-              <Link href="/student/courses" className="inline-block">
-                <span className="rounded-2xl px-5 py-3 bg-white text-black shadow hover:shadow-md transition-shadow">
-                  Продовжити навчання
-                </span>
-              </Link>
-              <Link href="/courses" className="inline-block">
-                <span className="rounded-2xl px-5 py-3 bg-[lavender] text-black shadow hover:shadow-md transition-shadow">
-                  Знайти нові курси
-                </span>
-              </Link>
-            </div>
+    <div className="max-w-6xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-4">Моє обране</h1>
+
+      {loading && <p>Завантаження...</p>}
+      {error && <p className="text-red-600">{error}</p>}
+
+      {!loading && !error && (
+        items.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 p-8 text-center">
+            <p className="text-slate-600">
+              Поки що порожньо. Додайте курси до обраного з їх сторінок.
+            </p>
           </div>
-
-          {/* mini profile */}
-          <div className="flex items-center gap-4 rounded-2xl bg-white/10 p-3 backdrop-blur">
-            {me?.profile_picture ? (
-              <Image
-                src={mediaUrl(me.profile_picture)}
-                alt="avatar"
-                width={56}
-                height={56}
-                className="rounded-full object-cover"
-              />
-            ) : (
-              <div className="rounded-full grid place-items-center bg-white text-black" style={{ width: 56, height: 56 }}>
-                {(me?.username || 'U').slice(0, 1).toUpperCase()}
-              </div>
-            )}
-            <div>
-              <div className="font-semibold">{me?.first_name || me?.username || 'Студент'}</div>
-              <div className="text-xs opacity-90">{me?.email}</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* error / reload */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={loadAll}
-          className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-300 hover:bg-slate-50"
-        >
-          Оновити
-        </button>
-        {error ? <div className="text-red-600 text-sm">{error}</div> : null}
-      </div>
-
-      {/* statistics */}
-      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Придбані курси" value={purchasedCount} bg="aliceblue" />
-        <StatCard title="Сертифікати" value={certificatesCount} bg="honeydew" />
-        <StatCard title="Відгуки" value="—" bg="oldlace" hint="Ще немає" />
-        <StatCard
-          title="Сповіщення"
-          value="—"
-          bg="mintcream"
-          hint={<Link href="/student/notifications">Переглянути</Link>}
-        />
-      </section>
-
-      {/* purchased courses */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Ваші курси</h2>
-          <Link href="/student/courses" className="text-sm underline">
-            Усі придбані
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 auto-rows-fr">
-          {loading ? (
-            Array.from({ length: 3 }, (_, i) => <SkeletonCourseCard key={i} />)
-          ) : purchased.length > 0 ? (
-            purchased.slice(0, 6).map((c) => <CourseCard key={c.id} course={c} />)
-          ) : (
-            <div className="rounded-3xl p-8 text-center bg-white shadow">
-              У вас ще немає придбаних курсів.
-              <div className="mt-3">
-                <Link href="/courses" className="underline">
-                  Перейти до каталогу
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {items.map(({ id, course }) => (
+              <div
+                key={id}
+                className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden"
+              >
+                <Link href={`/courses/${course.id}`}>
+                  <div className="aspect-video bg-slate-100 overflow-hidden">
+                    {course.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={course.image}
+                        alt={course.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400">
+                        No image
+                      </div>
+                    )}
+                  </div>
                 </Link>
+                <div className="p-4 space-y-2">
+                  <Link
+                    href={`/courses/${course.id}`}
+                    className="block font-semibold text-lg hover:underline"
+                  >
+                    {course.title}
+                  </Link>
+                  <div className="text-sm text-slate-500 flex items-center gap-3">
+                    {course.rating != null && <span>★ {course.rating}</span>}
+                    {course.price != null && <span>{course.price} ₴</span>}
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => removeFromWishlist(course.id)}
+                      className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-300 hover:bg-slate-50"
+                    >
+                      Видалити з обраного
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* quick links */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <QuickLink
-          title="Налаштувати профіль"
-          desc="Фото, ім’я, мова — зробіть акаунт зручнішим."
-          href="/student/settings"
-          bg="lavenderblush"
-        />
-        <QuickLink
-          title="Список бажаного"
-          desc="Збережені курси — щоб не загубити."
-          href="/student/wishlist"
-          bg="azure"
-        />
-        <QuickLink title="Історія замовлень" desc="Чеки та статуси платежів." href="/student/orders" bg="seashell" />
-      </section>
-    </div>
-  );
-}
-
-/* ===== Components ===== */
-function StatCard({
-  title,
-  value,
-  bg,
-  hint,
-}: {
-  title: string;
-  value: number | string;
-  bg: string;
-  hint?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-3xl p-5 bg-white shadow-xl">
-      <div className="rounded-2xl p-4" style={{ background: bg }}>
-        <div className="text-sm opacity-80">{title}</div>
-        <div className="mt-2 text-2xl font-semibold">{value}</div>
-        {hint ? <div className="mt-1 text-sm opacity-70">{hint}</div> : null}
-      </div>
-    </div>
-  );
-}
-
-function CourseCard({ course }: { course: Course }) {
-  const authorName = typeof course.author === 'object' ? (course.author.username as string) : undefined;
-
-  return (
-    <Link href={course.slug ? `/courses/${course.slug}/details` : `/courses/${course.id}/details`} className="block h-full">
-      <article className="rounded-3xl overflow-hidden h-full bg-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-1">
-        <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-          {course.image ? (
-            <Image
-              src={mediaUrl(course.image)}
-              alt={course.title}
-              fill
-              className="object-cover"
-              sizes="(max-width: 768px) 100vw, 33vw"
-            />
-          ) : (
-            <div className="absolute inset-0 grid place-items-center" style={{ background: 'gainsboro', color: 'black' }}>
-              Без зображення
-            </div>
-          )}
-        </div>
-        <div className="p-5">
-          <h3 className="font-semibold line-clamp-2">{course.title}</h3>
-          {authorName ? <div className="text-sm opacity-70 mt-1">Автор: {authorName}</div> : null}
-          <div className="mt-4 flex items-center justify-between text-sm opacity-80">
-            <span>Рейтинг: {course.rating ?? '—'}</span>
-            <span>Ціна: {course.price ?? '—'}</span>
+            ))}
           </div>
-        </div>
-      </article>
-    </Link>
-  );
-}
-
-function SkeletonCourseCard() {
-  return <div className="rounded-3xl bg-white shadow-xl h-[300px] animate-pulse" aria-label="loading" />;
-}
-
-function QuickLink({ title, desc, href, bg }: { title: string; desc: string; href: string; bg: string }) {
-  return (
-    <Link href={href} className="block">
-      <div className="rounded-3xl p-6 h-full bg-white shadow-xl hover:shadow-2xl transition-shadow">
-        <div className="rounded-2xl p-5" style={{ background: bg }}>
-          <div className="font-semibold">{title}</div>
-          <div className="opacity-80 mt-1 text-sm">{desc}</div>
-          <div className="mt-4 underline">Перейти</div>
-        </div>
-      </div>
-    </Link>
+        )
+      )}
+    </div>
   );
 }

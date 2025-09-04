@@ -231,7 +231,7 @@ const mentors = [
   },
 ];
 
-export function MentorsGallery() {
+function MentorsGallery() {
   return (
     <div className="relative z-10 -mt-10 overflow-hidden backdrop-blur-sm py-10 shadow-lg">
       <motion.div

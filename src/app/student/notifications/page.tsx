@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 const CHATS_URL = `${API_BASE}/api/chat/chats/`;
+const MESSAGES_URL = `${API_BASE}/api/chat/messages/`; // GET ?chat=ID, POST { chat, text }
+const READ_URL = `${API_BASE}/api/chat/read/`;
 
 type MiniTheory = {
   id: number;
@@ -14,15 +17,7 @@ type MiniTheory = {
   lesson_title?: string | null;
 };
 
-type LastPreview = {
-  id: number;
-  sender: number;
-  text: string;
-  created_at: string;
-  is_deleted: boolean;
-};
-
-type ChatItem = {
+type ChatInfo = {
   id: number;
   title?: string | null;
   theory?: MiniTheory | null;
@@ -30,28 +25,32 @@ type ChatItem = {
   teacher: number;
   unread_count: number;
   updated_at: string;
-  last_message?: number | null;
-  last_message_preview?: LastPreview | null;
 };
 
-export type Paginated<T> = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
+type Msg = {
+  id: number;
+  chat: number;
+  sender: number;
+  text: string;
+  created_at: string;
+  is_deleted: boolean;
 };
 
-function isPaginated<T>(x: unknown): x is Paginated<T> {
-  return !!x && typeof x === 'object' && Array.isArray((x as any).results);
+type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
+
+function fmtTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
-
-// ---- fetch all pages safely (no implicit any) ----
+function isPaginated<T>(x: any): x is Paginated<T> {
+  return x && typeof x === 'object' && Array.isArray(x.results);
+}
 async function collectAll<T>(firstUrl: string, headers?: HeadersInit): Promise<T[]> {
   const acc: T[] = [];
   let url: string | null = firstUrl;
 
   while (url) {
-    const init: RequestInit = { headers, cache: 'no-store' };
+    const init: RequestInit = { headers, cache: 'no-store' as RequestCache };
     const r: Response = await fetch(url, init);
     if (!r.ok) break;
 
@@ -59,65 +58,91 @@ async function collectAll<T>(firstUrl: string, headers?: HeadersInit): Promise<T
 
     if (Array.isArray(data)) {
       acc.push(...(data as T[]));
-      break; // server returned plain array => stop
+      break; // plain array => финальная «страница»
     }
 
     if (isPaginated<T>(data)) {
-      acc.push(...(data as Paginated<T>).results);
-      url = (data as Paginated<T>).next;
+      const page = data as Paginated<T>;
+      acc.push(...page.results);
+      url = page.next;
     } else {
-      break; // unknown shape => stop to avoid loop
+      break;
     }
   }
 
   return acc;
 }
 
-function fmtRel(iso?: string) {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function useChatId(): number | null {
+  const params = useParams();
+  const raw =
+    (params as any).chatId ??
+    (params as any).ChatId ??
+    (params as any).id ??
+    (params as any).Id ??
+    (params as any).chat ??
+    (params as any).Chat ??
+    null;
+  const num = typeof raw === 'string' ? Number(raw) : Array.isArray(raw) ? Number(raw[0]) : Number(raw);
+  return Number.isFinite(num) && num > 0 ? num : null;
 }
-function titleOf(c: ChatItem) {
-  return (
-    c?.theory?.title ||
-    c?.title ||
-    (c?.theory?.lesson_title ? `Урок: ${c.theory.lesson_title}` : `Чат #${c.id}`)
-  );
+function titleOf(c?: ChatInfo | null) {
+  if (!c) return 'Чат';
+  return c.theory?.title || c.title || (c.theory?.lesson_title ? `Урок: ${c.theory.lesson_title}` : `Чат #${c.id}`);
 }
 
-export default function StudentChatsListPage() {
-  const { isAuthenticated, accessToken } = useAuth() as {
+export default function StudentChatThreadPage() {
+  const chatId = useChatId();
+
+  const { isAuthenticated, accessToken, user } = useAuth() as {
     isAuthenticated: boolean;
     accessToken: string | null;
+    user?: { id?: number } | null;
   };
-
+  const myId = user?.id ?? -1;
   const headers: HeadersInit = useMemo(
     () => (accessToken ? ({ Authorization: `Bearer ${accessToken}` } as Record<string, string>) : {}),
     [accessToken],
     );
 
+  const [chat, setChat] = useState<ChatInfo | null>(null);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [items, setItems] = useState<ChatItem[]>([]);
-  const [q, setQ] = useState('');
+  const endRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs]);
 
   useEffect(() => {
     let cancelled = false;
     let pollTimer: any = null;
 
-    async function load() {
-      if (!isAuthenticated || !accessToken) {
+    async function loadThread() {
+      if (!isAuthenticated || !accessToken || !chatId) {
         setLoading(false);
         return;
       }
       setErr(null);
       setLoading(true);
       try {
-        const all = await collectAll<ChatItem>(`${CHATS_URL}?ordering=-updated_at&page_size=200`, headers);
-        if (!cancelled) {
-          all.sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at));
-          setItems(all);
+        const rChat = await fetch(`${CHATS_URL}${chatId}/`, { headers, cache: 'no-store' });
+        if (!rChat.ok) throw new Error('Не вдалося завантажити чат');
+        const info = (await rChat.json()) as ChatInfo;
+        if (!cancelled) setChat(info);
+
+        const list = await collectAll<Msg>(`${MESSAGES_URL}?chat=${chatId}&page_size=200`, headers);
+        if (!cancelled) setMsgs(list);
+
+        if (list.length) {
+          const lastId = list[list.length - 1].id;
+          fetch(READ_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+            body: JSON.stringify({ chat: chatId, last_read_message_id: lastId }),
+          }).catch(() => {});
         }
       } catch (e: any) {
         if (!cancelled) setErr(e?.message || 'Помилка завантаження.');
@@ -127,39 +152,79 @@ export default function StudentChatsListPage() {
     }
 
     async function poll() {
+      if (!chatId) return;
       try {
-        const all = await collectAll<ChatItem>(`${CHATS_URL}?ordering=-updated_at&page_size=200`, headers);
-        all.sort((a, b) => +new Date(b.updated_at) - +new Date(a.updated_at));
-        setItems(all);
-      } catch {
-        /* ignore */
-      }
+        const list = await collectAll<Msg>(`${MESSAGES_URL}?chat=${chatId}&page_size=200`, headers);
+        setMsgs((prev) => {
+          const prevLast = prev[prev.length - 1]?.id;
+          const nextLast = list[list.length - 1]?.id;
+          if (prevLast !== nextLast) {
+            if (list.length) {
+              const lastId = list[list.length - 1].id;
+              fetch(READ_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+                body: JSON.stringify({ chat: chatId, last_read_message_id: lastId }),
+              }).catch(() => {});
+            }
+            return list;
+          }
+          return prev;
+        });
+      } catch { /* ignore */ }
     }
 
-    load();
-    pollTimer = setInterval(poll, 7000);
+    loadThread();
+    pollTimer = setInterval(poll, 6000);
+
     return () => {
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [isAuthenticated, accessToken, headers]);
+  }, [isAuthenticated, accessToken, chatId, headers]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (!needle) return items;
-    return items.filter((c) => {
-      const t = titleOf(c).toLowerCase();
-      const prev = (c.last_message_preview?.text || '').toLowerCase();
-      return t.includes(needle) || prev.includes(needle);
-    });
-  }, [q, items]);
+  async function send() {
+    const text = input.trim();
+    if (!text || !chatId) return;
+    setInput('');
+
+    const optimistic: Msg = {
+      id: Date.now(),
+      chat: chatId,
+      sender: myId,
+      text,
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+    };
+    setMsgs((p) => [...p, optimistic]);
+
+    try {
+      await fetch(MESSAGES_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+        body: JSON.stringify({ chat: chatId, text }),
+      });
+    } catch {
+      setMsgs((p) => [
+        ...p,
+        {
+          id: Date.now() + 1,
+          chat: chatId,
+          sender: -9999,
+          text: '❌ Не вдалося надіслати. Перевірте мережу.',
+          created_at: new Date().toISOString(),
+          is_deleted: false,
+        },
+      ]);
+    }
+  }
 
   if (!isAuthenticated || !accessToken) {
     return (
       <main className="min-h-screen bg-slate-50 grid place-items-center p-6">
         <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6 max-w-xl text-center">
           <h1 className="text-xl font-bold">Потрібен вхід</h1>
-          <p className="text-slate-600 mt-2">Авторизуйтесь, щоб переглянути чати.</p>
+          <p className="text-slate-600 mt-2">Авторизуйтесь, щоб переглянути чат.</p>
           <div className="mt-3">
             <Link href="/login" className="px-4 py-2 rounded-xl bg-[#1345DE] text-white">Увійти</Link>
           </div>
@@ -168,60 +233,80 @@ export default function StudentChatsListPage() {
     );
   }
 
+  if (!chatId) {
+    return (
+      <main className="min-h-screen bg-slate-50 grid place-items-center p-6">
+        <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6 max-w-xl text-center">
+          <h1 className="text-xl font-bold">Невірний URL</h1>
+          <p className="text-slate-600 mt-2">ID чату не знайдено у шляху.</p>
+          <div className="mt-3">
+            <Link href="/student/notifications" className="px-4 py-2 rounded-xl bg-[#1345DE] text-white">Мої чати</Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-screen-md pt-20 px-4">
-        <header className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-[#0F2E64]">Мої чати</h1>
-          <Link href="/student" className="text-[#1345DE] hover:underline">Головна</Link>
-        </header>
+      <div className="mx-auto max-w-screen-2xl grid grid-cols-1 lg:grid-cols-[360px_1fr] h-screen">
+        {/* Sidebar */}
+        <aside className="border-r bg-white p-4 hidden lg:block">
+          <Link
+            href="/student/notifications"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl ring-1 ring-slate-200 hover:ring-[#1345DE] transition"
+            title="До списку чатів"
+          >
+            ← Мої чати
+          </Link>
+        </aside>
 
-        <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-3 mb-3">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Пошук чатів…"
-            className="w-full px-3 py-2 rounded-xl border"
-          />
-        </div>
+        {/* Thread */}
+        <section className="bg-white flex flex-col">
+          <header className="px-4 py-3 border-b flex items-center justify-between">
+            <div className="font-semibold truncate">{titleOf(chat)}</div>
+            <Link href="/student/notifications" className="lg:hidden text-[#1345DE]">Мої чати</Link>
+          </header>
 
-        {loading && <div className="text-slate-600">Завантаження…</div>}
-        {err && <div className="text-red-600 bg-red-50 border border-red-200 rounded p-2">{err}</div>}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-slate-50">
+            {loading && <div className="text-slate-500">Завантаження…</div>}
+            {err && !loading && (
+              <div className="text-red-600 bg-red-50 border border-red-200 rounded p-2">{err}</div>
+            )}
+            {!loading && !err && msgs.length === 0 && (
+              <div className="text-slate-500">Повідомлень поки немає</div>
+            )}
 
-        <div className="bg-white rounded-2xl ring-1 ring-slate-200 divide-y">
-          {filtered.length === 0 && !loading && !err && (
-            <div className="p-4 text-slate-500">Чатів поки немає.</div>
-          )}
-
-          {filtered.map((c) => {
-            const href = `/student/notifications/${c.id}`;
-            const preview = c.last_message_preview?.text || '';
-            const time = fmtRel(c.last_message_preview?.created_at || c.updated_at);
-            return (
-              <Link
-                key={c.id}
-                href={href}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition"
-              >
-                <div className="w-10 h-10 rounded-full bg-[#EEF3FF] grid place-items-center text-[#1345DE] font-bold">
-                  {String(titleOf(c)).slice(0, 1).toUpperCase()}
+            {msgs.map((m) => {
+              const mine = m.sender === myId;
+              return (
+                <div
+                  key={m.id}
+                  className={`max-w-[80%] rounded-lg p-2 ${
+                    mine ? 'bg-blue-100 ml-auto text-right' : 'bg-white ring-1 ring-slate-200'
+                  }`}
+                >
+                  <div className="text-xs text-slate-500 mb-1">{fmtTime(m.created_at)}</div>
+                  <div className="whitespace-pre-wrap break-words">{m.text}</div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="font-semibold text-[#0F2E64] truncate">{titleOf(c)}</div>
-                    <div className="text-xs text-slate-500 shrink-0">{time}</div>
-                  </div>
-                  <div className="text-sm text-slate-600 truncate">{preview}</div>
-                </div>
-                {c.unread_count > 0 && (
-                  <div className="ml-2 shrink-0 px-2 py-0.5 rounded-full bg-[#1345DE] text-white text-xs font-semibold">
-                    {c.unread_count}
-                  </div>
-                )}
-              </Link>
-            );
-          })}
-        </div>
+              );
+            })}
+            <div ref={endRef} />
+          </div>
+
+          <div className="border-t p-3 flex gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && send()}
+              className="flex-1 border rounded-xl p-2"
+              placeholder="Напишіть повідомлення…"
+            />
+            <button onClick={send} className="px-4 py-2 rounded-xl bg-[#1345DE] text-white">
+              Надіслати
+            </button>
+          </div>
+        </section>
       </div>
     </main>
   );

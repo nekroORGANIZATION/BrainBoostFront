@@ -1,16 +1,20 @@
 "use client";
+
 import * as React from "react";
-// NextUI global provider
-import { NextUIProvider } from "@nextui-org/react";
-// React Aria SSR provider to avoid hydration/SSR warnings and enable accessibility
 import { SSRProvider } from "react-aria";
+import { Provider as RACProvider } from "react-aria-components";
+import { NextUIProvider } from "@nextui-org/react";
+import { useRouter } from "next/navigation";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   return (
     <SSRProvider>
-      <NextUIProvider>
-        {children}
-      </NextUIProvider>
+      <RACProvider>
+        <NextUIProvider navigate={router.push}>
+          {children}
+        </NextUIProvider>
+      </RACProvider>
     </SSRProvider>
   );
 }

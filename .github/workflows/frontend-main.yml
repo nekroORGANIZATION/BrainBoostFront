@@ -72,7 +72,7 @@ jobs:
         shell: bash
         run: |
           ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
-            "${{ secrets.PROD_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
             "echo '${{ secrets.GHCR_READ_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USER }}' --password-stdin"
 
       - name: Pull & run container on Tester (port 3000)

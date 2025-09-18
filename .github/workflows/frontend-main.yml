@@ -63,16 +63,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p "${{ runner.temp }}"
-          printf '%s\n' "${{ secrets.PROD_KEY }}" | sed 's/\r$//' > "${{ runner.temp }}/k"
+          printf '%s\n' "${{ secrets.MAIN_SSH_KEY }}" | sed 's/\r$//' > "${{ runner.temp }}/k"
           chmod 600 "${{ runner.temp }}/k"
           ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
-            "${{ secrets.TARGET_USER }}@${{ secrets.TARGET_HOST }}" echo ok
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" echo ok
 
       - name: Login to GHCR on Tester
         shell: bash
         run: |
           ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
-            "${{ secrets.PROD_USER }}@${{ secrets.PROD_TARGET_HOST }}" \
+            "${{ secrets.PROD_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
             "echo '${{ secrets.GHCR_READ_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USER }}' --password-stdin"
 
       - name: Pull & run container on Tester (port 3000)
@@ -82,7 +82,7 @@ jobs:
           IMG_DEV: ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
           ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
-            "${{ secrets.PROD_USER }}@${{ secrets.PROD_TARGET_HOST }}" '
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" '
               set -e
               # стягуємо свіжі образи
               docker pull '"$IMG_SHA"' || true

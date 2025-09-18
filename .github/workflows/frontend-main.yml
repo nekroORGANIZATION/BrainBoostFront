@@ -3,26 +3,28 @@ name: Frontend → Prod (build in GitHub, run on VM)
 on:
   push:
     branches: ["main"]
-  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write        # щоб пушити в GHCR з GITHUB_TOKEN
 
 env:
   REGISTRY: ghcr.io
   OWNER: nekroorganization
-  IMAGE_NAME: frontend
+  IMAGE_NAME: frontend  
   IMAGE_TAG: ${{ github.sha }}
-
-permissions:
-  contents: read
-  packages: write
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: main
+    environment: main        # ← додали, щоб взяти secrets із env 'dev'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Log in to GHCR
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR (with PAT)
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -36,74 +38,80 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:prod
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+
+      # ⚠️ Якщо Dockerfile НЕ в корені репо, заміни context: '.' на потрібну теку (наприклад ./frontend)
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
 
   deploy-to-prod:
-    needs: build-and-push
     runs-on: self-hosted
     environment: main
+    needs: build-and-push
     steps:
-      - name: Prepare SSH key (robust)
+      - name: Prepare SSH key
         shell: bash
         run: |
-          set -euo pipefail
           mkdir -p "${{ runner.temp }}"
-          KEYFILE="${{ runner.temp }}/main_ssh_key"
+          printf '%s\n' "${{ secrets.PROD_KEY }}" | sed 's/\r$//' > "${{ runner.temp }}/k"
+          chmod 600 "${{ runner.temp }}/k"
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.TARGET_USER }}@${{ secrets.TARGET_HOST }}" echo ok
 
-          # ВАРІАНТ 1: якщо є MAIN_SSH_KEY_B64 (однорядковий base64)
-          if [ -n "${{ secrets.MAIN_SSH_KEY_B64 || '' }}" ]; then
-            echo "${{ secrets.MAIN_SSH_KEY_B64 }}" | base64 -d | tr -d '\r' > "$KEYFILE"
-          else
-            # ВАРІАНТ 2: MAIN_SSH_KEY — багаторядковий OpenSSH (BEGIN/END)
-            printf '%s\n' "${{ secrets.MAIN_SSH_KEY }}" | sed 's/\r$//' > "$KEYFILE"
-          fi
-          chmod 600 "$KEYFILE"
-
-          # Перевіримо, що ключ валідний і без passphrase
-          if ! ssh-keygen -y -f "$KEYFILE" >/dev/null 2>&1; then
-            echo "Invalid or passphrase-protected private key in MAIN_SSH_KEY/MAIN_SSH_KEY_B64"; exit 1
-          fi
-
-          # Порт (за замовчуванням 22)
-          PORT="${{ secrets.MAIN_SSH_PORT }}"
-          if [ -z "$PORT" ]; then PORT=22; fi
-          echo "$PORT" > "${{ runner.temp }}/ssh_port"
-
-          # known_hosts (не критично, якщо keyscan відсутній)
-          if command -v ssh-keyscan >/dev/null 2>&1; then
-            ssh-keyscan -p "$PORT" -H "${{ secrets.MAIN_TARGET_HOST }}" >> ~/.ssh/known_hosts || true
-            chmod 644 ~/.ssh/known_hosts || true
-          fi
-
-      - name: Sanity SSH check
+      - name: Login to GHCR on Tester
         shell: bash
         run: |
-          set -euo pipefail
-          KEYFILE="${{ runner.temp }}/main_ssh_key"
-          PORT="$(cat "${{ runner.temp }}/ssh_port")"
-          ssh -vvv -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
-            "echo OK-from-\$(hostname) as \$(whoami)"
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.TARGET_USER }}@${{ secrets.PROD_TARGET_HOST }}" \
+            "echo '${{ secrets.GHCR_READ_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USER }}' --password-stdin"
 
-      - name: Deploy via SSH
+      - name: Pull & run container on Tester (port 3000)
         shell: bash
+        env:
+          IMG_SHA: ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          IMG_DEV: ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
         run: |
-          set -euo pipefail
-          KEYFILE="${{ runner.temp }}/main_ssh_key"
-          PORT="$(cat "${{ runner.temp }}/ssh_port")"
-          ssh -i "$KEYFILE" -p "$PORT" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no \
-            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
-            "GHCR_USER='${{ secrets.GHCR_USER }}' GHCR_READ_TOKEN='${{ secrets.GHCR_READ_TOKEN }}' bash -s" << 'EOSH'
-              set -euo pipefail
-              cd /opt/myapp
-              if [ -n "${GHCR_USER:-}" ] && [ -n "${GHCR_READ_TOKEN:-}" ]; then
-                echo "$GHCR_READ_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin || true
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.PROD_USER }}@${{ secrets.PROD_TARGET_HOST }}" '
+              set -e
+              # стягуємо свіжі образи
+              docker pull '"$IMG_SHA"' || true
+              docker pull '"$IMG_DEV"' || true
+
+              # зупиняємо попередній контейнер
+              docker stop brainboost-front || true
+              docker rm   brainboost-front || true
+
+              # запускаємо новий (спробуємо спочатку за SHA для відтворюваності, fallback на :dev)
+              if docker image inspect '"$IMG_SHA"' >/dev/null 2>&1; then
+                IMG='"$IMG_SHA"'
+              else
+                IMG='"$IMG_DEV"'
               fi
-              docker compose pull frontend
-              docker compose up -d frontend
-              docker image prune -f
-          EOSH
-      - name: Cleanup SSH key
-        if: always()
-        run: |
-          rm -f "${{ runner.temp }}/main_ssh_key"
+
+              docker run -d --name brainboost-front --restart unless-stopped \
+                -p 3000:3000 "$IMG"
+
+              echo "Waiting for http://127.0.0.1:3000 ..."
+              for i in $(seq 1 60); do
+                code="$(curl -s -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || true)"
+                if [ -n "$code" ] && [ "$code" != "000" ]; then
+                  echo "Frontend is up (HTTP $code) ✅"
+                  exit 0
+                fi
+                sleep 1
+              done
+              echo "Frontend did not become ready in time. Logs:"
+              docker logs --tail=200 brainboost-front || true
+              exit 1
+            '

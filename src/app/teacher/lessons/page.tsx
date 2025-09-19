@@ -1,4 +1,3 @@
-'use client';
 import { Suspense } from 'react';
 
 // Disable prerendering/caching for this page to avoid SSR-only provider issues

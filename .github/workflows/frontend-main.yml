@@ -1,0 +1,117 @@
+name: Frontend → Prod (build in GitHub, run on VM)
+
+on:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  packages: write        # щоб пушити в GHCR з GITHUB_TOKEN
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: nekroorganization
+  IMAGE_NAME: frontend  
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: main        # ← додали, щоб взяти secrets із env 'dev'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR (with PAT)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USER }}
+          password: ${{ secrets.GHCR_WRITE_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+
+      # ⚠️ Якщо Dockerfile НЕ в корені репо, заміни context: '.' на потрібну теку (наприклад ./frontend)
+      - name: Build & push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+
+  deploy-to-prod:
+    runs-on: self-hosted
+    environment: main
+    needs: build-and-push
+    steps:
+      - name: Prepare SSH key
+        shell: bash
+        run: |
+          mkdir -p "${{ runner.temp }}"
+          printf '%s\n' "${{ secrets.MAIN_SSH_KEY }}" | sed 's/\r$//' > "${{ runner.temp }}/k"
+          chmod 600 "${{ runner.temp }}/k"
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" echo ok
+
+      - name: Login to GHCR on Tester
+        shell: bash
+        run: |
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" \
+            "echo '${{ secrets.GHCR_READ_TOKEN }}' | docker login ghcr.io -u '${{ secrets.GHCR_USER }}' --password-stdin"
+
+      - name: Pull & run container on Tester (port 3000)
+        shell: bash
+        env:
+          IMG_SHA: ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          IMG_DEV: ghcr.io/${{ env.OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        run: |
+          ssh -i "${{ runner.temp }}/k" -p "${{ secrets.TARGET_SSH_PORT || 22 }}" -o StrictHostKeyChecking=no \
+            "${{ secrets.MAIN_RUNNER_USER }}@${{ secrets.MAIN_TARGET_HOST }}" '
+              set -e
+              # стягуємо свіжі образи
+              docker pull '"$IMG_SHA"' || true
+              docker pull '"$IMG_DEV"' || true
+
+              # зупиняємо попередній контейнер
+              docker stop brainboost-front || true
+              docker rm   brainboost-front || true
+
+              # запускаємо новий (спробуємо спочатку за SHA для відтворюваності, fallback на :dev)
+              if docker image inspect '"$IMG_SHA"' >/dev/null 2>&1; then
+                IMG='"$IMG_SHA"'
+              else
+                IMG='"$IMG_DEV"'
+              fi
+
+              docker run -d --name brainboost-front --restart unless-stopped \
+                -p 3000:3000 "$IMG"
+
+              echo "Waiting for http://127.0.0.1:3000 ..."
+              for i in $(seq 1 60); do
+                code="$(curl -s -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || true)"
+                if [ -n "$code" ] && [ "$code" != "000" ]; then
+                  echo "Frontend is up (HTTP $code) ✅"
+                  exit 0
+                fi
+                sleep 1
+              done
+              echo "Frontend did not become ready in time. Logs:"
+              docker logs --tail=200 brainboost-front || true
+              exit 1
+            '

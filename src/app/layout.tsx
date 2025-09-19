@@ -1,42 +1,31 @@
-'use client';
+// app/layout.tsx
+import './globals.css';
+import { Afacad, Mulish } from 'next/font/google';
+import { AuthProvider } from '@/context/AuthContext';
+import { AccessibilityProvider } from '@/context/AccessibilityContext';
+import Navbar from '@/components/Navbar';
 
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
-import Navbar from "@/components/Navbar";
-import { usePathname } from "next/navigation";
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
 
-const geistSans = Geist({
-    variable: "--font-geist-sans",
-    subsets: ["latin"],
-});
+const afacad = Afacad({ subsets: ['latin', 'cyrillic-ext'], weight: ['600','700'], variable: '--font-afacad' });
+const mulish = Mulish({ subsets: ['latin','cyrillic','cyrillic-ext'], weight: ['400','500','600','700','800'], variable: '--font-mulish' });
 
-const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
-});
+export const metadata = { title: 'BrainBoost', description: 'Навчальна платформа' };
 
-// якщо хочеш залишити metadata, перенеси в page.tsx
-// export const metadata: Metadata = { ... }
-
-export default function RootLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
-    const pathname = usePathname();
-    const hideNavbarRoutes = ['/login', '/register'];
-    const showNavbar = !hideNavbarRoutes.includes(pathname);
-
-    return (
-        <html lang="ua">
-            <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} style={{ color: 'black' }}>
-                <AuthProvider>
-                    {showNavbar && <Navbar />}
-                    {children}
-                </AuthProvider>
-            </body>
-        </html>
-    );
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="uk" suppressHydrationWarning>
+      <body className={`${afacad.variable} ${mulish.variable} font-mulish antialiased min-h-screen w-full`} style={{color:'black'}}>
+        <AccessibilityProvider>
+          <AuthProvider>
+            <Navbar hideOn={['/login','/register']} />
+            {children}
+          </AuthProvider>
+        </AccessibilityProvider>
+      </body>
+    </html>
+  );
 }

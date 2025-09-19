@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://172.17.10.22:8000',
+  baseURL: 'https://brainboost.pp.ua/api',
 });
 
 api.interceptors.request.use(

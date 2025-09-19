@@ -1,7 +1,7 @@
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const res = await fetch('http://172.17.10.22:8000/paypal/create/', {
+  const res = await fetch('https://brainboost.pp.ua/api/paypal/create/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

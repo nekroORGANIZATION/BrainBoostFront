@@ -1,251 +1,214 @@
 'use client';
 
-import Link from "next/link";
-import { useAuth } from "@/context/AuthContext";
+import Link from 'next/link';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
-export default function Navbar() {
+type NavbarProps = { hideOn?: string[] };
+
+export default function Navbar({ hideOn = [] }: NavbarProps) {
   const { isAuthenticated, logout } = useAuth();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Закривати моб-меню при навігації
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Пункти меню
+  const menuItems = [
+    { href: '/courses',  label: 'Всі курси' },
+    { href: '/reviews',  label: 'Відгуки' },
+    { href: '/faq',      label: 'Питання та відповіді' },
+    { href: '/about',    label: 'Про нас' },
+    { href: '/contacts', label: 'Контакти' },
+  ];
+  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
+
+  const matched = menuItems.find((i) => isActive(i.href));
+  const crumbCurrent =
+    matched?.label || decodeURIComponent(pathname.split('/').filter(Boolean).slice(-1)[0] || '');
+
+  // Приховати хедер на певних сторінках
+  const shouldHide = hideOn.some((p) => pathname === p || pathname.startsWith(p + '/'));
+  if (shouldHide) return null;
+
+  // Широкий контейнер
+  const Wrap = 'mx-auto w-full max-w-[1680px] px-4 sm:px-6 md:px-10 lg:px-14 xl:px-20 2xl:px-28';
 
   return (
-    <>
-      <nav className="navbar">
-        <div className="logo">Brainboost</div>
+    <header className="sticky top-0 z-[9999] w-full bg-transparent bg-[url('/images/back.png')] bg-cover bg-fixed bg-center/cover backdrop-blur-sm">
+      {/* Один контейнер у 2 рядки: 1) topbar  2) breadcrumb */}
+      <div className={`${Wrap} grid grid-cols-[auto_1fr_auto] grid-rows-[auto_auto] items-center gap-x-4 pt-2 pb-2`}>
+        {/* ЛОГО (картинка) */}
+        <Link
+          href="/"
+          aria-label="На головну"
+          className="relative row-start-1 col-start-1 shrink-0 block h-[52px] w-[210px] md:h-[58px] md:w-[240px] lg:h-[64px] lg:w-[270px]"
+        >
+          <Image
+            src="/images/logo.png"        // змінюй шлях за потреби
+            alt="Brainboost"
+            fill
+            priority
+            sizes="(max-width:768px) 210px, (max-width:1024px) 240px, 270px"
+            className="object-contain select-none"
+          />
+        </Link>
 
-        <div className="nav-links">
-          <Link href="/" className="link">Головна</Link>
-          <Link href="/courses" className="link">Всі курси</Link>
-          <Link href="/reviews" className="link">Відгуки</Link>
-          <Link href="/faq" className="link">Питання та відповіді</Link>
+        {/* Центр-меню (desktop) */}
+        <div
+          className="row-start-1 col-start-2 hidden md:flex min-w-0 justify-center overflow-x-auto whitespace-nowrap
+                     items-center gap-8 lg:gap-10 text-[18px] lg:text-[20px] font-semibold text-[#0B1437]
+                     [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+        >
+          {menuItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group relative inline-block px-1 transition-colors ${
+                  active ? 'text-[#1345DE]' : 'hover:text-[#1345DE]'
+                }`}
+              >
+                {item.label}
+                <span
+                  className={`pointer-events-none absolute -bottom-2 left-1/2 h-[2px] -translate-x-1/2 rounded bg-[#1345DE] transition-all
+                    ${active ? 'w-7 opacity-100' : 'w-0 opacity-0 group-hover:w-7 group-hover:opacity-100'}`}
+                />
+              </Link>
+            );
+          })}
         </div>
 
-        <div className="lang-auth">
-          <div className="lang-switch">UA ENG</div>
+        {/* Правий блок (desktop) */}
+        <div className="row-start-1 col-start-3 hidden md:flex shrink-0 justify-self-end items-center gap-5 lg:gap-7">
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            <button className="text-[#1345DE]">UA</button>
+            <span className="text-slate-400">/</span>
+            <button className="hover:text-[#1345DE]">ENG</button>
+          </div>
 
           {!isAuthenticated ? (
-            <>
-              <Link href="/login" className="btn btn-primary">Вхід</Link>
-              <Link href="/register" className="btn btn-outline">Реєстрація</Link>
-            </>
+            <Link
+              href="/login"
+              className="rounded-2xl bg-[#1345DE] px-5 py-2.5 text-[15px] font-bold text-white transition hover:bg-[#0e2fbe]"
+            >
+              Увійти
+            </Link>
           ) : (
-            <>
-              <Link href="/profile" className="btn btn-icon" aria-label="Профіль">
-                {/* Іконка профілю (SVG) */}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#1345DE" strokeWidth="2" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                  <circle cx="12" cy="7" r="4" />
-                  <path d="M5.5 21a8.38 8.38 0 0 1 13 0" />
+            <div className="flex items-center gap-3 lg:gap-4">
+              <Link href="/teacher" className="text-[15px] font-bold text-[#1345DE] hover:underline">
+                Викладач
+              </Link>
+              <Link
+                href="/profile"
+                className="grid h-11 w-11 place-items-center rounded-full ring-1 ring-[#E5ECFF] bg-white text-[#1345DE] hover:ring-[#1345DE]"
+                aria-label="Профіль"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round"
+                        d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.25a8.25 8.25 0 0115 0"/>
                 </svg>
               </Link>
-
-              <button onClick={logout} className="btn btn-logout" aria-label="Вийти">
-                Вийти
-                {/* Іконка виходу */}
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="#fff" strokeWidth="2" viewBox="0 0 24 24" width="18" height="18" style={{marginLeft: '6px'}}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 16v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-10a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v1" />
+              <button
+                onClick={logout}
+                className="grid h-11 w-11 place-items-center rounded-full ring-1 ring-[#E5ECFF] bg-white text-[#1345DE] hover:ring-[#1345DE]"
+                aria-label="Вийти"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round"
+                        d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6A2.25 2.25 0 005.25 5.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12"/>
                 </svg>
               </button>
-            </>
+            </div>
           )}
         </div>
-      </nav>
 
-      <style jsx>{`
-        nav.navbar {
-          position: relative;
-          height: 56px;
-          display: flex;
-          align-items: center;
-          padding: 0 20px;
-          background: white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-          font-family: 'Mulish', sans-serif;
-          user-select: none;
-          background-image: url('/images/back.png');
-        }
+        {/* BREADCRUMB — фіксовано під логотипом, без JS-обчислень */}
+        {pathname !== '/' && (
+          <div className="row-start-2 col-start-1 justify-self-start">
+            <nav
+              className="mt-2 md:mt-2.5 ml-10 md:ml-14 inline-flex items-center gap-2
+                        text-[14px] text-slate-600 rounded-lg px-2.5 py-1 ring-1 ring-black/5"
+            >
+              <Link href="/" className="text-[#021C4E] hover:underline">Головна</Link>
+              <span className="text-slate-400">/</span>
+              <span className="text-[#1345DE]">{crumbCurrent}</span>
+            </nav>
+          </div>
+        )}
 
-        .logo {
-          position: absolute;
-          left: 118px;
-          top: 8px;
-          font-family: 'Afacad', sans-serif;
-          font-weight: 700;
-          font-size: 36px;
-          line-height: 40px;
-          color: #021C4E;
-        }
+        {/* Бургер (mobile) */}
+        <button
+          className="row-start-1 col-start-3 md:hidden justify-self-end grid h-11 w-11 place-items-center rounded-2xl ring-1 ring-[#E5ECFF] bg-white/95 backdrop-blur text-[#1345DE]"
+          aria-label="Меню"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <div className="relative h-5 w-6">
+            <span className={`absolute left-0 h-0.5 w-6 rounded bg-current transition-transform ${open ? 'top-2.5 rotate-45' : 'top-0'}`} />
+            <span className={`absolute left-0 h-0.5 w-6 rounded bg-current transition-opacity ${open ? 'top-2.5 opacity-0' : 'top-[10px] opacity-100'}`} />
+            <span className={`absolute left-0 h-0.5 w-6 rounded bg-current transition-transform ${open ? 'top-2.5 -rotate-45' : 'top-[20px]'}`} />
+          </div>
+        </button>
+      </div>
 
-        .nav-links {
-          position: absolute;
-          left: 369px;
-          top: 22px;
-          display: flex;
-          gap: 24px;
-          font-weight: 600;
-          font-size: 13px;
-          line-height: 16px;
-          color: #000000;
-          align-items: center;
-          height: 16px;
-        }
+      {/* Мобільний дроуер */}
+      <div
+        className={`md:hidden overflow-hidden border-t border-slate-200 transition-[max-height] duration-300 ease-in-out ${open ? 'max-h-[80vh]' : 'max-h-0'}`}
+      >
+        <div className={`${Wrap} px-4 py-4`}>
+          <div className="grid gap-3">
+            {menuItems.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`rounded-2xl px-4 py-3 text-[17px] font-semibold ring-1 ring-[#E5ECFF] bg-white/95 backdrop-blur active:scale-[0.99] transition
+                  ${isActive(item.href) ? 'text-[#1345DE] ring-[#1345DE]' : 'text-[#0B1437]'}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
 
-        .nav-links .link {
-          color: inherit;
-          text-decoration: none;
-          cursor: pointer;
-          transition: color 0.3s ease;
-          padding: 4px 0;
-          border-bottom: 2px solid transparent;
-        }
-        .nav-links .link:hover {
-          color: #1345DE;
-          border-bottom-color: #1345DE;
-        }
-        .nav-links .active {
-          color: #1345DE;
-          border-bottom-color: #1345DE;
-        }
+          <div className="mt-4 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-[15px] font-semibold">
+              <button className="text-[#1345DE]">UA</button>
+              <span className="text-slate-400">/</span>
+              <button className="hover:text-[#1345DE]">ENG</button>
+            </div>
 
-        .lang-auth {
-          position: absolute;
-          right: 118px;
-          top: 22px;
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          font-weight: 500;
-          font-size: 13px;
-          line-height: 16px;
-          color: #1345DE;
-          height: 16px;
-        }
-
-        .lang-switch {
-          cursor: pointer;
-          user-select: none;
-          font-weight: 600;
-          transition: color 0.3s ease;
-        }
-        .lang-switch:hover {
-          color: #0e2db9;
-        }
-
-        .btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          padding: 6px 16px;
-          border-radius: 10px;
-          font-family: 'Mulish', sans-serif;
-          font-weight: 600;
-          font-size: 13px;
-          line-height: 16px;
-          cursor: pointer;
-          user-select: none;
-          transition: background-color 0.3s ease, color 0.3s ease;
-          text-decoration: none;
-          border: none;
-        }
-
-        .btn-primary {
-          background-color: #1345DE;
-          color: #fff;
-        }
-        .btn-primary:hover {
-          background-color: #0e2db9;
-        }
-
-        .btn-outline {
-          background-color: transparent;
-          color: #1345DE;
-          border: 2px solid #1345DE;
-        }
-        .btn-outline:hover {
-          background-color: #1345DE;
-          color: #fff;
-        }
-
-        .btn-outline.small {
-          padding: 4px 12px;
-          font-size: 11px;
-        }
-
-        .btn-icon {
-          background: transparent;
-          border: none;
-          padding: 4px;
-          cursor: pointer;
-          transition: transform 0.2s ease;
-          color: #1345DE;
-        }
-        .btn-icon:hover {
-          transform: scale(1.1);
-          color: #0e2db9;
-        }
-
-        .btn-logout {
-          background: #1345DE;
-          color: white;
-          border-radius: 10px;
-          padding: 6px 14px;
-          font-weight: 600;
-          font-size: 13px;
-          line-height: 16px;
-          border: none;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          transition: background-color 0.3s ease;
-          user-select: none;
-        }
-        .btn-logout:hover {
-          background: #0e2db9;
-        }
-
-        /* Адаптив */
-        @media (max-width: 1024px) {
-          nav.navbar {
-            height: auto;
-            flex-wrap: wrap;
-            padding: 10px 20px;
-          }
-          .logo {
-            position: static;
-            margin-bottom: 10px;
-          }
-          .nav-links {
-            position: static;
-            margin-bottom: 10px;
-            gap: 16px;
-            font-size: 12px;
-          }
-          .lang-auth {
-            position: static;
-            gap: 12px;
-            font-size: 12px;
-            justify-content: center;
-            width: 100%;
-          }
-        }
-
-        @media (max-width: 640px) {
-          .logo {
-            font-size: 28px;
-          }
-          .nav-links {
-            flex-wrap: wrap;
-            justify-content: center;
-            font-size: 11px;
-          }
-          .lang-auth {
-            font-size: 11px;
-          }
-          .btn, .btn-logout {
-            font-size: 12px;
-            padding: 5px 12px;
-          }
-        }
-      `}</style>
-    </>
+            {!isAuthenticated ? (
+              <Link
+                href="/login"
+                className="rounded-2xl bg-[#1345DE] px-6 py-3 text-[16px] font-bold text-white transition hover:bg-[#0e2fbe]"
+              >
+                Увійти
+              </Link>
+            ) : (
+              <div className="flex gap-3">
+                <Link
+                  href="/profile"
+                  className="rounded-2xl bg-white px-5 py-3 text-[16px] font-bold text-[#1345DE] ring-1 ring-[#E5ECFF]"
+                >
+                  Профіль
+                </Link>
+                <button
+                  onClick={logout}
+                  className="rounded-2xl bg-white px-5 py-3 text-[16px] font-bold text-[#1345DE] ring-1 ring-[#E5ECFF]"
+                >
+                  Вийти
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
   );
 }

@@ -3,44 +3,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import http from '@/lib/http';
+import http, { setAuthHeader } from '@/lib/http';
 import { mediaUrl } from '@/lib/media';
 import { useAuth } from '@/context/AuthContext';
 
-/* =========================
-   Типи
-========================= */
 type Review = {
   id: number | string;
   rating: number;
   text?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-
-  // до чого відгук
   course?:
     | { id: number; slug?: string; title?: string; image?: string | null }
     | number
     | null;
-
-  // додаткове
   likes?: number | string | null;
   replies_count?: number | string | null;
-  media?: string[] | null; // зображення/файли
+  media?: string[] | null;
 };
 
 type SortKey = 'date' | 'rating';
 type SortDir = 'asc' | 'desc';
 
-/* =========================
-   Константи API
-========================= */
-const REVIEWS_URL = '/reviews/me/';
-const REVIEWS_URL_FALLBACK = '/me/reviews/'; // на випадок іншого роутингу
-
-/* =========================
-   Хелпери
-========================= */
 function useDebounced<T>(value: T, ms = 400) {
   const [v, setV] = useState(value);
   useEffect(() => {
@@ -86,7 +70,6 @@ function mapRowToReview(row: any): Review {
       ? { id: r.course }
       : null;
 
-  // media: рядок/масив/undefined → масив абсолютних URL
   let media: string[] | null = null;
   if (Array.isArray(r?.media)) {
     media = r.media.map((m: any) => toAbs(String(m))).filter(Boolean) as string[];
@@ -94,8 +77,7 @@ function mapRowToReview(row: any): Review {
     media = [toAbs(String(r.media))!].filter(Boolean);
   }
 
-  const rating =
-    normalizeNum(r?.rating) !== null ? (normalizeNum(r.rating) as number) : 0;
+  const rating = normalizeNum(r?.rating) ?? 0;
 
   return {
     id: r?.id ?? Math.random().toString(36).slice(2),
@@ -114,16 +96,9 @@ function formatDate(d?: string | null) {
   if (!d) return '—';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
-  return dt.toLocaleDateString('uk-UA', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  });
+  return dt.toLocaleDateString('uk-UA', { year: 'numeric', month: 'short', day: '2-digit' });
 }
 
-/* =========================
-   Сторінка
-========================= */
 export default function MyReviewsPage() {
   const { accessToken } = useAuth();
 
@@ -131,39 +106,40 @@ export default function MyReviewsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // UI-фільтри
   const [query, setQuery] = useState('');
   const [minRating, setMinRating] = useState<number | null>(null);
   const [withMedia, setWithMedia] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const debouncedQuery = useDebounced(query, 350);
-  const initialized = useRef(false);
+
+  useEffect(() => {
+    setAuthHeader(accessToken || null);
+  }, [accessToken]);
 
   const fetchReviews = useCallback(async () => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setError('Потрібна авторизація для перегляду відгуків.');
+      setReviews([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      let res;
-      try {
-        res = await http.get(REVIEWS_URL);
-      } catch (e: any) {
-        if (e?.response?.status === 404) {
-          res = await http.get(REVIEWS_URL_FALLBACK);
-        } else {
-          throw e;
-        }
-      }
+      const res = await http.get('/api/reviews/mine/'); // <-- ПРАВИЛЬНИЙ ШЛЯХ
       const raw = pickPayload(res.data);
       const mapped = raw.map(mapRowToReview);
       setReviews(mapped);
     } catch (e: any) {
+      const status = e?.response?.status;
       setError(
-        e?.response?.status === 401
+        status === 401
           ? 'Потрібна авторизація для перегляду відгуків.'
-          : 'Не вдалося завантажити відгуки.'
+          : `Не вдалося завантажити відгуки${status ? ` (HTTP ${status})` : ''}.`
       );
       setReviews([]);
     } finally {
@@ -173,28 +149,22 @@ export default function MyReviewsPage() {
 
   useEffect(() => {
     fetchReviews();
-    initialized.current = true;
   }, [fetchReviews]);
 
-  // Статистика
   const stats = useMemo(() => {
     const total = reviews.length;
     const avg =
       total === 0
         ? 0
-        : Math.round(
-            (reviews.reduce((s, r) => s + (r.rating || 0), 0) / total) * 10
-          ) / 10;
+        : Math.round((reviews.reduce((s, r) => s + (r.rating || 0), 0) / total) * 10) / 10;
     const withPics = reviews.filter((r) => (r.media?.length || 0) > 0).length;
     const high = reviews.filter((r) => r.rating >= 4).length;
     return { total, avg, withPics, high };
   }, [reviews]);
 
-  // Фільтрація + сортування
   const filtered = useMemo(() => {
     let arr = reviews.slice();
 
-    // пошук у назві/тексті/курсі
     const q = debouncedQuery.trim().toLowerCase();
     if (q) {
       arr = arr.filter((r) => {
@@ -213,7 +183,6 @@ export default function MyReviewsPage() {
       arr = arr.filter((r) => (r.media?.length || 0) > 0);
     }
 
-    // сортування
     arr.sort((a, b) => {
       const dir = sortDir === 'asc' ? 1 : -1;
       if (sortKey === 'date') {
@@ -221,7 +190,6 @@ export default function MyReviewsPage() {
         const bb = b.created_at ? new Date(b.created_at).getTime() : 0;
         return (aa - bb) * dir;
       }
-      // rating
       return (a.rating - b.rating) * dir;
     });
 
@@ -230,128 +198,148 @@ export default function MyReviewsPage() {
 
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <section
-          className="rounded-3xl p-6 md:p-8"
-          style={{
-            background: 'linear-gradient(to right, royalblue, mediumslateblue)',
-            color: 'white',
-            boxShadow: '0 18px 40px rgba(0,0,0,0.2)',
-          }}
-        >
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-semibold">Мої відгуки</h1>
-              <p className="mt-2 opacity-95">
-                Ваші оцінки курсів із пошуком, фільтрами, сортуванням та зручними діями.
-              </p>
+      <div className="min-h-screen bg-white/60">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+          <section
+            className="rounded-3xl p-6 md:p-8"
+            style={{
+              background: 'linear-gradient(to right, royalblue, mediumslateblue)',
+              color: 'white',
+              boxShadow: '0 18px 40px rgba(0,0,0,0.2)',
+            }}
+          >
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-semibold">Мої відгуки</h1>
+                <p className="mt-2 opacity-95">
+                  Ваші оцінки курсів із пошуком, фільтрами, сортуванням і швидкими діями.
+                </p>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+                <Link href="/student">
+                  <span className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 bg-white text-slate-900 font-medium shadow hover:shadow-md transition w-full sm:w-auto">
+                    Кабінет студента
+                  </span>
+                </Link>
+                <Link href="/courses">
+                  <span className="inline-flex items-center justify-center rounded-2xl px-5 py-2.5 bg-indigo-600 text-white font-medium shadow hover:bg-indigo-700 transition w-full sm:w-auto">
+                    Знайти нові курси
+                  </span>
+                </Link>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Link href="/student" className="inline-block">
-                <span className="rounded-2xl px-4 py-2 bg-white text-black shadow hover:shadow-md transition-shadow">
-                  Кабінет студента
-                </span>
-              </Link>
-              <Link href="/courses" className="inline-block">
-                <span className="rounded-2xl px-4 py-2 bg-[lavender] text-black shadow hover:shadow-md transition-shadow">
-                  Знайти нові курси
-                </span>
-              </Link>
-            </div>
-          </div>
-        </section>
 
-        {/* Stats */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Всього відгуків" value={stats.total} bg="aliceblue" />
-          <StatCard title="Середня оцінка" value={stats.avg.toFixed(1)} bg="honeydew" />
-          <StatCard title="З фото/файлами" value={stats.withPics} bg="oldlace" />
-          <StatCard title="Оцінка 4–5" value={stats.high} bg="mintcream" />
-        </section>
+            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+              <StatCard title="Всього" value={stats.total} bg="aliceblue" />
+              <StatCard title="Середня" value={stats.avg.toFixed(1)} bg="honeydew" />
+              <StatCard title="З медіа" value={stats.withPics} bg="oldlace" />
+              <StatCard title="Оцінка 4–5" value={stats.high} bg="mintcream" />
+            </div>
+          </section>
 
-        {/* Controls */}
-        <section className="rounded-3xl bg-white shadow-xl p-4 md:p-5">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-            <div className="md:col-span-5">
-              <label className="text-sm opacity-80">Пошук</label>
-              <input
-                type="text"
-                placeholder="Курс або текст відгуку…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="mt-1 w-full rounded-2xl px-4 py-3 bg-[whitesmoke] outline-none"
-              />
-            </div>
-            <div className="md:col-span-3">
-              <label className="text-sm opacity-80">Мін. оцінка</label>
-              <select
-                className="mt-1 w-full rounded-2xl px-4 py-3 bg-[whitesmoke] outline-none"
-                value={minRating === null ? '' : String(minRating)}
-                onChange={(e) => setMinRating(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">Без фільтра</option>
-                <option value="1">Від 1</option>
-                <option value="2">Від 2</option>
-                <option value="3">Від 3</option>
-                <option value="4">Від 4</option>
-                <option value="5">Лише 5</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="text-sm opacity-80">Медіа</label>
+          <section className="rounded-3xl bg-white shadow-xl p-4 sm:p-5">
+            <div className="flex items-center justify-between sm:justify-start sm:gap-4">
+              <div className="sm:flex-1">
+                <label className="text-sm opacity-80">Пошук</label>
+                <input
+                  type="text"
+                  placeholder="Курс або текст відгуку…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="mt-1 w-full rounded-2xl px-4 py-3 bg-[whitesmoke] outline-none"
+                />
+              </div>
+
               <button
-                className={[
-                  'mt-1 w-full rounded-2xl px-4 py-3 shadow transition-all',
-                  withMedia ? 'bg-[honeydew]' : 'bg-[whitesmoke]',
-                ].join(' ')}
-                onClick={() => setWithMedia((v) => !v)}
+                className="sm:hidden ml-3 mt-6 rounded-2xl px-4 py-3 bg-[aliceblue] shadow"
+                onClick={() => setFiltersOpen((v) => !v)}
+                aria-expanded={filtersOpen}
+                aria-controls="filters-panel"
               >
-                {withMedia ? 'Лише з медіа' : 'Усі'}
+                {filtersOpen ? 'Сховати фільтри' : 'Фільтри'}
               </button>
             </div>
-            <div className="md:col-span-2">
-              <label className="text-sm opacity-80">Сортування</label>
-              <div className="mt-1 grid grid-cols-2 gap-2">
+
+            <div
+              id="filters-panel"
+              className={[
+                'grid grid-cols-1 sm:grid-cols-12 gap-4 items-end mt-4',
+                filtersOpen ? '' : 'hidden sm:grid',
+              ].join(' ')}
+            >
+              <div className="sm:col-span-3">
+                <label className="text-sm opacity-80">Мін. оцінка</label>
+                <select
+                  className="mt-1 w-full rounded-2xl px-4 py-3 bg-[whitesmoke] outline-none"
+                  value={minRating === null ? '' : String(minRating)}
+                  onChange={(e) => setMinRating(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Без фільтра</option>
+                  <option value="1">Від 1</option>
+                  <option value="2">Від 2</option>
+                  <option value="3">Від 3</option>
+                  <option value="4">Від 4</option>
+                  <option value="5">Лише 5</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-sm opacity-80">Медіа</label>
                 <button
                   className={[
-                    'rounded-2xl px-3 py-2 bg-[aliceblue] shadow',
-                    sortKey === 'date' ? 'ring-2 ring-[mediumslateblue]' : '',
+                    'mt-1 w-full rounded-2xl px-4 py-3 shadow transition',
+                    withMedia ? 'bg-[honeydew]' : 'bg-[whitesmoke]',
                   ].join(' ')}
-                  onClick={() => setSortKey('date')}
+                  onClick={() => setWithMedia((v) => !v)}
                 >
-                  За датою
+                  {withMedia ? 'Лише з медіа' : 'Усі'}
                 </button>
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="text-sm opacity-80">Сортування</label>
+                <div className="mt-1 grid grid-cols-2 gap-2">
+                  <button
+                    className={[
+                      'rounded-2xl px-3 py-2 bg-[aliceblue] shadow',
+                      sortKey === 'date' ? 'ring-2 ring-[mediumslateblue]' : '',
+                    ].join(' ')}
+                    onClick={() => setSortKey('date')}
+                  >
+                    За датою
+                  </button>
+                  <button
+                    className={[
+                      'rounded-2xl px-3 py-2 bg-[aliceblue] shadow',
+                      sortKey === 'rating' ? 'ring-2 ring-[mediumslateblue]' : '',
+                    ].join(' ')}
+                    onClick={() => setSortKey('rating')}
+                  >
+                    За оцінкою
+                  </button>
+                </div>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-sm opacity-80">Напрямок</label>
                 <button
-                  className={[
-                    'rounded-2xl px-3 py-2 bg-[aliceblue] shadow',
-                    sortKey === 'rating' ? 'ring-2 ring-[mediumslateblue]' : '',
-                  ].join(' ')}
-                  onClick={() => setSortKey('rating')}
-                >
-                  За оцінкою
-                </button>
-                <button
-                  className="rounded-2xl px-3 py-2 bg-[aliceblue] shadow col-span-2"
+                  className="mt-1 w-full rounded-2xl px-3 py-3 bg-[aliceblue] shadow"
                   onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
                 >
-                  Напрямок: {sortDir === 'asc' ? '↑' : '↓'}
+                  {sortDir === 'asc' ? 'Зростання ↑' : 'Спадання ↓'}
                 </button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        {/* Grid */}
-        <section className="space-y-3">
-          <div className="opacity-80 text-sm">
+          <div className="opacity-80 text-sm px-1">
             Знайдено: <span className="font-semibold">{loading ? '…' : filtered.length}</span>
             {!loading && reviews.length !== filtered.length ? (
               <span className="opacity-70"> (усього {reviews.length})</span>
             ) : null}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 auto-rows-fr">
             {loading
               ? Array.from({ length: 6 }, (_, i) => <SkeletonReview key={i} />)
               : filtered.length > 0
@@ -362,7 +350,10 @@ export default function MyReviewsPage() {
                     <div>
                       {error}
                       <div className="mt-3">
-                        <button onClick={fetchReviews} className="rounded-2xl px-4 py-2 mt-2 bg-[lavender] shadow">
+                        <button
+                          onClick={fetchReviews}
+                          className="rounded-2xl px-4 py-2 mt-2 bg-[lavender] shadow"
+                        >
                           Спробувати ще раз
                         </button>
                       </div>
@@ -371,22 +362,21 @@ export default function MyReviewsPage() {
                     <>
                       У вас ще немає відгуків.
                       <div className="mt-3">
-                        <Link href="/courses" className="underline">Перейти до курсів</Link>
+                        <Link href="/courses" className="underline">
+                          Перейти до курсів
+                        </Link>
                       </div>
                     </>
                   )}
                 </div>
               )}
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </main>
   );
 }
 
-/* =========================
-   Компоненти
-========================= */
 function StatCard({
   title,
   value,
@@ -398,7 +388,7 @@ function StatCard({
 }) {
   return (
     <div
-      className="rounded-3xl p-5"
+      className="rounded-2xl p-4 md:p-5 text-black"
       style={{ background: bg, boxShadow: '0 12px 28px rgba(0,0,0,0.08)' }}
     >
       <div className="text-sm opacity-80">{title}</div>
@@ -424,9 +414,10 @@ function ReviewCard({ review }: { review: Review }) {
   const likes = normalizeNum(review.likes) ?? 0;
   const replies = normalizeNum(review.replies_count) ?? 0;
 
+  const href = courseSlug ? `/courses/${courseSlug}` : courseId ? `/courses/${courseId}` : '#';
+
   return (
-    <article className="rounded-3xl overflow-hidden h-full bg-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-1 flex flex-col">
-      {/* Top */}
+    <article className="rounded-3xl overflow-hidden h-full bg-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5 flex flex-col">
       <div className="relative w-full h-36 bg-gradient-to-r from-blue-600 to-indigo-500">
         {courseImage ? (
           <Image
@@ -435,9 +426,10 @@ function ReviewCard({ review }: { review: Review }) {
             fill
             sizes="400px"
             className="object-cover opacity-70"
+            unoptimized
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-white/90">
+          <div className="absolute inset-0 grid place-items-center text-white/90 px-4 text-center">
             {courseTitle || 'Курс'}
           </div>
         )}
@@ -448,10 +440,11 @@ function ReviewCard({ review }: { review: Review }) {
         </div>
       </div>
 
-      {/* Body */}
       <div className="p-5 flex-1 flex flex-col">
         <h3 className="font-semibold line-clamp-2">{courseTitle || 'Відгук'}</h3>
-        <div className="text-xs opacity-70 mt-0.5">Опубліковано: {formatDate(review.created_at)}</div>
+        <div className="text-xs opacity-70 mt-0.5">
+          Опубліковано: {formatDate(review.created_at)}
+        </div>
 
         {review.text ? (
           <p className="mt-3 text-sm opacity-90 whitespace-pre-wrap">
@@ -477,30 +470,28 @@ function ReviewCard({ review }: { review: Review }) {
                   width={300}
                   height={200}
                   className="object-cover w-full h-24"
+                  unoptimized
                 />
               </a>
             ))}
           </div>
         )}
 
-        {/* Actions */}
         <div className="mt-auto pt-4 flex flex-wrap gap-2 items-center">
-          {courseSlug || courseId ? (
+          {href !== '#' ? (
             <Link
-              href={courseSlug ? `/courses/${courseSlug}` : `/courses/${courseId}`}
+              href={href}
               className="rounded-xl px-3 py-2 bg-[aliceblue] shadow hover:shadow-md"
             >
               Перейти до курсу
             </Link>
           ) : null}
 
-          {/* зазвичай редагування/видалення — через модалки/окремі ендпоінти;
-              кнопки залишаю як заглушки/якір — підʼєднаєш коли будуть ендпоінти */}
           <button
             type="button"
             disabled
             className="rounded-xl px-3 py-2 bg-white border shadow opacity-60 cursor-not-allowed"
-            title="Потрібен ендпоінт PUT/PATCH"
+            title="Потрібен ендпойнт PUT/PATCH"
           >
             Редагувати
           </button>
@@ -508,7 +499,7 @@ function ReviewCard({ review }: { review: Review }) {
             type="button"
             disabled
             className="rounded-xl px-3 py-2 bg-white border shadow opacity-60 cursor-not-allowed"
-            title="Потрібен ендпоінт DELETE"
+            title="Потрібен ендпойнт DELETE"
           >
             Видалити
           </button>

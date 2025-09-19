@@ -1,17 +1,10 @@
 // src/lib/http.ts
-import axios, {
-  AxiosError,
-  AxiosHeaders,
-  AxiosRequestConfig,
-  AxiosResponse,
-  InternalAxiosRequestConfig,
-  RawAxiosRequestHeaders,
-} from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
-/** ===================== Endpoints ===================== */
 export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
+// ← звір ці шляхи з бекендом і поправ, якщо інші:
 export const LOGIN_URL    = '/accounts/api/login/';
 export const REGISTER_URL = '/accounts/api/register/';
 export const ME_URL       = '/accounts/api/profile/';
@@ -19,182 +12,176 @@ export const REFRESH_URL  = '/accounts/api/token/refresh/';
 
 const inBrowser = typeof window !== 'undefined';
 
-/** ======================================================
- *   Глобальный access header (истина — только тут)
- * ====================================================== */
-let currentAccessHeader: string | null = null;
+/** =================================================================
+ *  Єдина “істина” щодо токена в памʼяті. В заголовки його штовхає
+ *  лише setAuthHeader(). Запити підстраховуються: якщо токен не
+ *  виставлений — спробують дістати зі storage.
+ * ================================================================= */
+let currentAccessToken: string | null = null;
+const AUTH_SCHEME = 'Bearer'; // для SimpleJWT: 'Bearer'; якщо у вас 'JWT' — заміни тут.
 
-/** Единый способ обновить Authorization в инстансе */
-export function setAuthHeader(token?: string | null): void {
-  currentAccessHeader = token ? `Bearer ${token}` : null;
+export function setAuthHeader(token?: string | null) {
+  currentAccessToken = token ?? null;
 
-  // defaults.headers может быть AxiosHeaders или объект
-  const d = http.defaults.headers as unknown;
-  const headersAsAxios = d as AxiosHeaders;
-  const headersAsRaw = d as RawAxiosRequestHeaders;
-
-  if (currentAccessHeader) {
-    if (typeof headersAsAxios.set === 'function') {
-      headersAsAxios.set('Authorization', currentAccessHeader);
-    } else {
-      headersAsRaw.Authorization = currentAccessHeader;
-    }
+  if (currentAccessToken) {
+    http.defaults.headers.common.Authorization = `${AUTH_SCHEME} ${currentAccessToken}`;
   } else {
-    if (typeof headersAsAxios.delete === 'function') {
-      headersAsAxios.delete('Authorization');
-    } else {
-      delete headersAsRaw.Authorization;
-    }
+    delete http.defaults.headers.common.Authorization;
   }
 }
 
-/** ===================== Axios instance ===================== */
+/** Яке сховище містить конкретний ключ (session чи local) */
+function whichStorageHas(key: 'access' | 'refresh'): 'session' | 'local' | null {
+  if (!inBrowser) return null;
+  if (sessionStorage.getItem(key)) return 'session';
+  if (localStorage.getItem(key)) return 'local';
+  return null;
+}
+
+function readStored(key: 'access' | 'refresh'): string | null {
+  if (!inBrowser) return null;
+  return sessionStorage.getItem(key) ?? localStorage.getItem(key);
+}
+
+function writeStored(key: 'access' | 'refresh', val: string | null, prefer: 'session' | 'local' | null) {
+  if (!inBrowser) return;
+  const target = prefer === 'session' ? sessionStorage : prefer === 'local' ? localStorage : localStorage;
+  const other  = target === localStorage ? sessionStorage : localStorage;
+
+  if (val === null) {
+    target.removeItem(key);
+  } else {
+    target.setItem(key, val);
+  }
+  // Тримаємо копію тільки в одному сховищі
+  other.removeItem(key);
+}
+
+function clearAllTokens() {
+  if (!inBrowser) return;
+  localStorage.removeItem('access');  localStorage.removeItem('refresh');
+  sessionStorage.removeItem('access'); sessionStorage.removeItem('refresh');
+}
+
+/** =================================================================
+ *  Axios інстанс
+ * ================================================================= */
 const http = axios.create({
   baseURL: API_BASE,
-  headers: { 'Content-Type': 'application/json' },
+  // НЕ задаємо тут Content-Type — нехай Axios сам ставить для JSON/FormData
+  withCredentials: false,
 });
 
-/** Всегда подставляем актуальный Authorization */
-http.interceptors.request.use(
-  (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    if (currentAccessHeader) {
-      const h = (config.headers ??
-        {}) as AxiosHeaders | RawAxiosRequestHeaders;
-
-      if (typeof (h as AxiosHeaders).set === 'function') {
-        (h as AxiosHeaders).set('Authorization', currentAccessHeader);
-        config.headers = h as InternalAxiosRequestConfig['headers'];
-      } else {
-        const raw: RawAxiosRequestHeaders = {
-          ...(h as RawAxiosRequestHeaders),
-          Authorization: currentAccessHeader,
-        };
-        config.headers = raw as InternalAxiosRequestConfig['headers'];
+/** -----------------------------------------------------------------
+ *  REQUEST: підстраховка — якщо заголовок не виставили через
+ *  setAuthHeader, дістанемо токен зі storage (session → local).
+ * ----------------------------------------------------------------- */
+http.interceptors.request.use((config) => {
+  const hasAuth = !!config.headers?.Authorization;
+  if (!hasAuth) {
+    if (currentAccessToken) {
+      config.headers = config.headers || {};
+      (config.headers as any).Authorization = `${AUTH_SCHEME} ${currentAccessToken}`;
+    } else {
+      // Легка підстраховка: дістати токен зі storage (щоб перший рендер не ловив 401)
+      const stored = readStored('access');
+      if (stored) {
+        setAuthHeader(stored);
+        config.headers = config.headers || {};
+        (config.headers as any).Authorization = `${AUTH_SCHEME} ${stored}`;
       }
     }
-    return config;
   }
-);
+  return config;
+});
 
-/** ===================== Refresh logic (optional) ===================== */
+/** =================================================================
+ *  RESPONSE: refresh-token flow із чергою під час оновлення
+ * ================================================================= */
 let isRefreshing = false;
-let pendingQueue: Array<(token: string | null) => void> = [];
+let pendingQueue: Array<(tkn: string | null) => void> = [];
 
-function notifyQueue(token: string | null): void {
-  pendingQueue.forEach((cb) => cb(token));
+function flushQueue(token: string | null) {
+  pendingQueue.forEach((cb) => {
+    try { cb(token); } catch {}
+  });
   pendingQueue = [];
 }
 
-async function refreshAccess(): Promise<string | null> {
+async function refreshAccess(): Promise<{ access: string | null, store: 'session' | 'local' | null }> {
+  const store = whichStorageHas('refresh');
+  const refresh = readStored('refresh');
+  if (!refresh) return { access: null, store: null };
+
   try {
-    // Если refresh хранится в storage — читаем его здесь
-    const refresh = inBrowser
-      ? sessionStorage.getItem('refresh') ?? localStorage.getItem('refresh')
-      : null;
-
-    if (!refresh) return null;
-
-    const res: AxiosResponse<{ access?: string }> = await axios.post(
-      `${API_BASE}${REFRESH_URL}`,
-      { refresh }
-    );
-
-    const newAccess = res.data?.access ?? null;
-
-    if (newAccess) {
-      if (inBrowser) localStorage.setItem('access', newAccess);
-      setAuthHeader(newAccess);
-      return newAccess;
-    }
+    const res = await axios.post(`${API_BASE}${REFRESH_URL}`, { refresh });
+    const newAccess: string | null = res.data?.access || null;
+    return { access: newAccess, store };
   } catch {
-    /* ignore */
+    return { access: null, store };
   }
-  return null;
 }
 
 http.interceptors.response.use(
   (r) => r,
-  async (error: AxiosError): Promise<never | AxiosResponse> => {
-    const original = error.config as (AxiosRequestConfig & { _retry?: boolean }) | undefined;
+  async (error: AxiosError) => {
     const status = error.response?.status;
+    const original = error.config as (AxiosRequestConfig & { _retry?: boolean });
 
-    if (status === 401 && original && !original._retry) {
+    if (status === 401 && !original?._retry) {
       original._retry = true;
 
-      // уже идёт refresh — ждём его
+      // Якщо вже йде рефреш — підпишемося в чергу
       if (isRefreshing) {
-        return new Promise<AxiosResponse>((resolve, reject) => {
+        return new Promise((resolve, reject) => {
           pendingQueue.push((token) => {
-            if (!token) {
-              reject(error);
-              return;
-            }
-            const existing = (original.headers ??
-              {}) as AxiosHeaders | RawAxiosRequestHeaders;
-
-            if (typeof (existing as AxiosHeaders).set === 'function') {
-              (existing as AxiosHeaders).set('Authorization', `Bearer ${token}`);
-              original.headers = existing;
-            } else {
-              original.headers = {
-                ...(existing as RawAxiosRequestHeaders),
-                Authorization: `Bearer ${token}`,
-              } as RawAxiosRequestHeaders;
-            }
+            if (!token) return reject(error);
+            original.headers = original.headers || {};
+            (original.headers as any).Authorization = `${AUTH_SCHEME} ${token}`;
             resolve(http(original));
           });
         });
       }
 
-      try {
-        isRefreshing = true;
-        const token = await refreshAccess();
-        isRefreshing = false;
-        notifyQueue(token);
+      isRefreshing = true;
 
-        if (!token) {
-          if (inBrowser) {
-            localStorage.removeItem('access');
-            sessionStorage.removeItem('access');
-            localStorage.removeItem('refresh');
-            sessionStorage.removeItem('refresh');
-            if (!location.pathname.startsWith('/login')) {
-              window.location.href = '/login';
-            }
+      try {
+        const { access: newAccess, store } = await refreshAccess();
+        isRefreshing = false;
+
+        if (!newAccess) {
+          flushQueue(null);
+          clearAllTokens();
+          setAuthHeader(null);
+          if (inBrowser && !location.pathname.startsWith('/login')) {
+            // мʼякий редірект на логін
+            window.location.href = '/login';
           }
-          // пробрасываем исходную ошибку
           return Promise.reject(error);
         }
 
-        const hdrs = (original.headers ??
-          {}) as AxiosHeaders | RawAxiosRequestHeaders;
-        if (typeof (hdrs as AxiosHeaders).set === 'function') {
-          (hdrs as AxiosHeaders).set('Authorization', `Bearer ${token}`);
-          original.headers = hdrs;
-        } else {
-          original.headers = {
-            ...(hdrs as RawAxiosRequestHeaders),
-            Authorization: `Bearer ${token}`,
-          } as RawAxiosRequestHeaders;
-        }
+        // Зберігаємо оновлений access в те ж сховище, де був refresh
+        writeStored('access', newAccess, store);
+        setAuthHeader(newAccess);
+        flushQueue(newAccess);
 
+        // Повторюємо оригінальний запит з новим токеном
+        original.headers = original.headers || {};
+        (original.headers as any).Authorization = `${AUTH_SCHEME} ${newAccess}`;
         return http(original);
       } catch (e) {
         isRefreshing = false;
-        notifyQueue(null);
-        if (inBrowser) {
-          localStorage.removeItem('access');
-          sessionStorage.removeItem('access');
-          localStorage.removeItem('refresh');
-          sessionStorage.removeItem('refresh');
-          if (!location.pathname.startsWith('/login')) {
-            window.location.href = '/login';
-          }
+        flushQueue(null);
+        clearAllTokens();
+        setAuthHeader(null);
+        if (inBrowser && !location.pathname.startsWith('/login')) {
+          window.location.href = '/login';
         }
         return Promise.reject(e);
       }
     }
 
+    // інші помилки — далі по ланцюжку
     return Promise.reject(error);
   }
 );

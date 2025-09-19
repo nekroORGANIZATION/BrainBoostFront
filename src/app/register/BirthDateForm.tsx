@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { RegisterFormData } from './page';
 import { useAuth } from '@/context/AuthContext';
-import { register } from '@/services/AuthService';
+import { registerUser } from '@/lib/api';
+import Link from 'next/link';
+import Image from 'next/image';
 
 type Props = {
   onBack: () => void;
@@ -80,7 +82,7 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
     setError(null);
     setBusy(true);
     try {
-      const res = await register(
+      const res = await registerUser(
         values.role as 'student' | 'teacher',
         values.name,
         values.email,
@@ -113,8 +115,18 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
 
   return (
     <div className="flex items-center justify-center h-screen bg-white relative overflow-hidden">
-      <div className="absolute top-6 left-6 text-lg font-bold text-blue-900">LOGO</div>
-
+      <Link href="/" aria-label="На головну"
+        className="absolute left-6 top-6 z-50 inline-flex items-center rounded-xl
+                  bg-white/70 backdrop-blur px-3 py-2 ring-1 ring-black/5 hover:bg-white/80">
+        <Image
+          src="/images/logo.png"
+          alt="Brand logo"
+          width={262}
+          height={56}
+          priority
+          className="select-none"
+        />
+      </Link>
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-700" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)' }} />
       <div
         className="absolute top-1/2 right-0 w-[350px] h-[300px] bg-blue-700 -translate-y-1/2"

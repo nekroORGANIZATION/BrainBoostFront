@@ -6,6 +6,7 @@ import { Star, Calendar, Clock, Video } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, BookOpen, CheckSquare, Users, Award ,BarChart, Youtube, MonitorCheck, Search, Target, Mail, Puzzle, Megaphone, Lightbulb } from "lucide-react";
+import FooterCard from '@/components/FooterCard';
 
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
@@ -30,45 +31,6 @@ interface ItemPosition {
   gradientDirection: "to-r" | "to-l";
 }
 
-
-function Header() {
-  return (
-    <header className="absolute top-0 left-0 w-full z-20">
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 flex items-center justify-between py-6">
-        <div className="font-[Afacad] font-bold text-[36px] leading-[100%] text-slate-900">
-          Brainboost
-        </div>
-        <nav className="hidden md:flex items-center ml-[120px] gap-[180px]">
-          <a
-            href="#speakers"
-            className="font-[Mulish] font-medium text-[20px] leading-[100%] text-slate-700 hover:text-indigo-600"
-          >
-            Спікери
-          </a>
-          <a
-            href="#program"
-            className="font-[Mulish] font-medium text-[20px] leading-[100%] text-slate-700 hover:text-indigo-600"
-          >
-            Програма
-          </a>
-          <a
-            href="#reviews"
-            className="font-[Mulish] font-medium text-[20px] leading-[100%] text-slate-700 hover:text-indigo-600"
-          >
-            Відгуки
-          </a>
-        </nav>
-        <Link
-            href="/enroll"
-            className="w-[192px] h-[52px] flex items-center justify-center rounded-[44px] border-[3px] border-[#1345DE] bg-white text-[#1345DE] font-semibold transition-colors duration-300 hover:bg-[#1345DE] hover:text-white"
-          >
-            Записатися на курс
-          </Link>
-      </div>
-    </header>
-  );
-}
-
 interface CardProps {
   title: string;
   description: string;
@@ -79,33 +41,33 @@ function CourseCard({ title, description, width = "full" }: CardProps) {
   return (
     <motion.div
       variants={fadeUp}
-      className="flex flex-col md:flex-row items-start gap-8 w-full"
+      className="flex flex-col md:flex-row items-start gap-6 w-full"
     >
       <div
-        className="rounded-lg flex items-center justify-center p-4"
+        className="rounded-lg flex items-center justify-center px-4 py-3 w-full md:w-auto"
         style={{
           background:
             "linear-gradient(90deg, rgba(10, 37, 120, 0.6) 42.24%, rgba(255, 255, 255, 0.6) 98.51%)",
           color: "#1345DE",
-          minWidth: width,
+          // 👉 тільки для desktop, на мобі завжди w-full
+          minWidth: typeof window !== "undefined" && window.innerWidth >= 768 ? width : "auto",
         }}
       >
-        <span className="font-[Mulish] font-bold text-[24px]">{title}</span>
+        <span className="font-[Mulish] font-bold text-lg sm:text-xl md:text-2xl text-center break-words">
+          {title}
+        </span>
       </div>
 
       <div
-        className="p-6"
+        className="p-4 sm:p-6 w-full max-w-[800px]"
         style={{
           color: "black",
-          width: "100%",
-          maxWidth: "800px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-start",
-          marginTop: "-40px",
         }}
       >
-        <p className="font-[Mulish] font-medium text-[24px] leading-[140%]">
+        <p className="font-[Mulish] font-medium text-base sm:text-lg md:text-xl leading-relaxed break-words whitespace-normal">
           {description}
         </p>
       </div>
@@ -142,26 +104,26 @@ function WhoIsThisCourseFor() {
   ];
 
   return (
-    <section className="relative w-full backdrop-blur-sm pt-32 px-6 lg:px-8 pb-32 rounded-xl shadow-lg">
+    <section className="relative w-full backdrop-blur-sm pt-16 sm:pt-24 lg:pt-32 px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24 lg:pb-32 rounded-xl shadow-lg">
       <motion.h2
         variants={fadeUp}
         initial="hidden"
         whileInView="show"
         viewport={{ once: true }}
-        className="font-[Afacad] font-bold text-[42px] text-center mb-25"
+        className="font-[Afacad] font-bold text-2xl sm:text-3xl lg:text-[42px] text-center mb-10 sm:mb-16 lg:mb-25"
         style={{ maxWidth: "389px", margin: "0 auto" }}
       >
         <span className="text-[#1345DE]">Кому</span>{" "}
         <span className="text-black">підходить курс</span>
       </motion.h2>
 
-      <div className="mt-70">
+      <div className="mt-8 sm:mt-12 lg:mt-70">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           whileInView="show"
           viewport={{ once: true }}
-          className="flex flex-col gap-12"
+          className="flex flex-col gap-8 sm:gap-12"
         >
           {cards.map((card, idx) => (
             <CourseCard
@@ -270,63 +232,64 @@ export function MentorsGallery() {
 
 function Hero() {
   return (
-    <section className="relative min-h-screen flex items-start overflow-hidden backdrop-blur-sm shadow-md">
-      <Header />
-      <div className="mx-auto max-w-7xl px-6 lg:px-8 w-full">
+    <section className="relative min-h-screen flex items-start overflow-hidden shadow-md">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 w-full">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
           animate="show"
-          className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start pt-28"
+          className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 items-start pt-16 sm:pt-24 md:pt-28"
         >
-          <motion.div variants={fadeUp}>
+          <motion.div variants={fadeUp} className="flex flex-col items-center md:items-start text-center md:text-left">
             <h1
-              className="font-[Afacad] font-bold text-[56px] leading-[120%] text-slate-900 mt-32 mb-12"
-              style={{ width: "530px", height: "128px" }}
+              className="font-[Afacad] font-bold text-3xl sm:text-4xl md:text-[56px] leading-snug md:leading-[120%] text-slate-900 mt-12 sm:mt-16 md:mt-32 mb-6 sm:mb-10 md:mb-12"
             >
               Комплексний{" "}
               <span className="text-black whitespace-nowrap">
                 інтернет-маркетинг
               </span>
             </h1>
-            <div className="flex items-center gap-3 mb-12">
+
+            <div className="flex justify-center md:justify-start items-center gap-2 sm:gap-3 mb-8 sm:mb-10 md:mb-12">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
-                  className="h-12 w-12 fill-[#EBDB25] text-[#EBDB25]"
+                  className="h-6 w-6 sm:h-8 sm:w-8 md:h-12 md:w-12 fill-[#EBDB25] text-[#EBDB25]"
                 />
               ))}
-              <span className="ml-3 font-[Mulish] font-bold text-[16px] text-black whitespace-nowrap">
-                4.85/5 – 57 відгуків
-              </span>
             </div>
+
             <p
-              className="font-[Mulish] font-medium text-[24px] text-black mb-12"
-              style={{ width: "530px" }}
+              className="font-[Mulish] font-medium text-base sm:text-lg md:text-[24px] text-black mb-8 sm:mb-10 md:mb-12 max-w-full md:max-w-[530px]"
             >
               Опануйте найпопулярніші digital-інструменти та запустіть першу
               рекламну кампанію.
             </p>
-            <div className="flex items-center gap-4">
+
+            <div className="flex justify-center md:justify-start items-center gap-4">
               <a
                 href="#signup"
-                className="rounded-full bg-indigo-600 w-[192px] h-[52px] flex items-center justify-center font-semibold text-white shadow hover:bg-indigo-700 transition"
+                onClick={(e) => {
+                  e.preventDefault();
+                  const link = e.currentTarget;
+
+                  link.classList.add("scale-95");
+                  setTimeout(() => link.classList.remove("scale-95"), 150);
+
+                  document.getElementById("signup")?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="px-6 sm:px-8 py-2 sm:py-3 rounded-[44px] border-[3px] border-[#1345DE] bg-white text-[#1345DE] font-semibold transition duration-300 hover:bg-[#1345DE] hover:text-white transform"
               >
                 Записатися на курс
               </a>
-              <a
-                href="#program"
-                className="rounded-full border border-black w-[192px] h-[52px] flex items-center justify-center font-semibold text-black hover:bg-black hover:text-white transition"
-              >
-                Переглянути програму
-              </a>
             </div>
           </motion.div>
-          <motion.div variants={fadeUp} className="relative">
+
+          <motion.div variants={fadeUp} className="relative flex justify-center md:justify-end mt-10 md:mt-0">
             <img
-              src="images/hero-illustration.png.png"
+              src="/images/hero-illustration.png.png"
               alt="Hero"
-              className="rounded-[30px] object-cover w-full max-w-[630px]"
+              className="rounded-[20px] sm:rounded-[24px] md:rounded-[30px] object-cover w-full max-w-[400px] sm:max-w-[500px] md:max-w-[630px]"
             />
           </motion.div>
         </motion.div>
@@ -337,25 +300,30 @@ function Hero() {
 
 function WhatYouLearn() {
   return (
-    <section className="w-full px-6 mt-36 py-28"> 
-      {/* 👆 додав mt-32 для більшого відступу від каруселі */}
-      <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-start gap-24">
+    <section className="w-full px-4 sm:px-6 mt-16 sm:mt-24 lg:mt-36 py-12 sm:py-20 lg:py-28">
+      <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-start gap-12 md:gap-24">
         
         {/* Ліва частина */}
-        <h2 className="font-[Afacad] font-bold text-[56px] leading-[110%] max-w-[419px]">
+        <h2
+          className="font-[Afacad] font-bold 
+                    text-4xl sm:text-4xl lg:text-[56px] 
+                    leading-snug lg:leading-[110%] 
+                    w-full md:max-w-[419px] 
+                    text-center md:text-left mx-auto md:mx-0"
+        >
           Чому конкретно <br />
           ви навчитеся <span className="text-[#1345DE]">за</span> <br />
           <span className="text-[#1345DE]">4 місяці</span>
         </h2>
 
         {/* Права частина */}
-        <div className="flex flex-col gap-6 max-w-[508px] md:mt-6">
-          <p className="font-[Mulish] font-medium text-[24px] leading-[120%] text-black">
+        <div className="flex flex-col gap-4 sm:gap-6 max-w-full md:max-w-[508px] md:mt-6 text-center md:text-left">
+          <p className="font-[Mulish] font-medium text-base sm:text-lg lg:text-[24px] leading-relaxed text-black">
             Ви отримаєте структуровані знання, тотальну практику та досвід 
             кращих спікерів в своїх напрямках діяльності.
           </p>
 
-          <p className="font-[Mulish] font-bold text-[40px] leading-[120%] text-black whitespace-nowrap">
+          <p className="font-[Mulish] font-bold text-xl sm:text-2xl lg:text-[40px] leading-snug lg:leading-[120%] text-black break-words">
             <span className="text-[#1345DE]">15</span> модулів{" "}
             <span className="text-[#1345DE]">98</span> занять{" "}
             <span className="text-[#1345DE]">17</span> спікерів
@@ -377,58 +345,60 @@ function PreStartBlock() {
   ];
 
   return (
-    <section className="w-[1200px] mx-auto bg-white rounded-xl shadow-lg border border-gray-200">
+    <section className="w-full max-w-[1200px] mx-auto bg-white rounded-xl shadow-lg border border-gray-200 px-4 sm:px-6 lg:px-12 py-6 sm:py-12 lg:py-16">
+      
       {/* Верхня частина */}
-      <div className="flex items-center gap-6 px-12 pt-12">
-        <button className="w-[248px] h-[68px] bg-[#1345DE] rounded-xl font-bold text-[20px] text-white">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 mb-4 sm:mb-6">
+        <button className="w-full sm:w-[248px] h-[52px] sm:h-[68px] bg-[#1345DE] rounded-xl font-bold text-base sm:text-[20px] text-white">
           Заняття PRE-START
         </button>
-        <p className="text-[32px] font-bold text-black ml-[150px]">
+        <p className="text-lg sm:text-[32px] font-bold text-black text-center md:text-left">
           Продакт курсу, ментор, координатори
         </p>
       </div>
 
       {/* Лінія */}
-      <hr className="border-t-2 border-[#82A1FF99] w-[87%] mx-auto my-6" />
+      <hr className="border-t-2 border-[#82A1FF99] w-full sm:w-[87%] mx-auto my-4 sm:my-6" />
 
       {/* Список пунктів */}
-      <div className="flex flex-col gap-25 pb-12 mt-30">
+      <div className="flex flex-col gap-4 sm:gap-6 mb-6 sm:mb-8">
         {items.map((item, i) => {
           const isLeft = item.side === "left";
           const gradient = isLeft ? "bg-gradient-to-l" : "bg-gradient-to-r";
-          const justifyContent = isLeft ? "justify-start" : "justify-end";
-          const paddingSide = "px-6"; // внутрішній відступ тексту від країв блоку
-
+          const justifyContent = isLeft ? "justify-start md:justify-start" : "justify-end md:justify-end";
+          
           return (
             <div
               key={i}
-              className={`${gradient} from-[#FFFFFF99] to-[#0A257899] w-full h-[92px] flex items-center ${justifyContent} ${paddingSide} rounded-xl`}
+              className={`${gradient} from-[#FFFFFF99] to-[#0A257899] w-full h-[72px] sm:h-[92px] flex items-center ${justifyContent} px-4 sm:px-6 rounded-xl`}
             >
-              <p className="font-medium text-[20px] text-black">{item.text}</p>
+              <p className="font-medium text-base sm:text-[20px] text-black text-center md:text-left break-words">
+                {item.text}
+              </p>
             </div>
           );
         })}
       </div>
 
       {/* Фіолетовий блок */}
-      <div className="w-full bg-[#82A1FF99] flex justify-center">
-        <div className="p-12 flex flex-col gap-2 text-left max-w-[800px]">
-          <h3 className="font-bold text-[24px] text-black mb-2">В результаті</h3>
-          <p className="font-medium text-[17px] text-black">
+      <div className="w-full bg-[#82A1FF99] flex justify-center mb-4 sm:mb-8">
+        <div className="p-4 sm:p-12 flex flex-col gap-2 text-center md:text-left max-w-full md:max-w-[800px]">
+          <h3 className="font-bold text-lg sm:text-[24px] mb-2">В результаті</h3>
+          <p className="font-medium text-sm sm:text-[17px]">
             В результаті участі в організаційному зідзвоні та подальшому вивченні матеріалів
           </p>
-          <p className="font-medium text-[17px] text-black">
+          <p className="font-medium text-sm sm:text-[17px]">
             модулю 0 студенти краще розуміють процес навчання, отримують відповіді на свої
           </p>
-          <p className="font-medium text-[18px] text-black">
+          <p className="font-medium text-sm sm:text-[18px]">
             запитання, знайомляться, адаптуються
           </p>
         </div>
       </div>
 
       {/* Кнопка під фіолетовим блоком */}
-      <div className="px-15 py-20">
-        <button className="w-[424px] h-[68px] bg-[#1345DE] rounded-xl font-bold text-[20px] text-white">
+      <div className="flex justify-center mb-4 sm:mb-0">
+        <button className="w-full sm:w-[424px] h-[52px] sm:h-[68px] bg-[#1345DE] rounded-xl font-bold text-base sm:text-[20px] text-white">
           Хочу стати інтернет-маркетологом
         </button>
       </div>
@@ -455,22 +425,23 @@ function MarketingTopicsSection() {
   ];
 
   return (
-    <section className="w-[1200px] mx-auto flex gap-8 mt-40">
+    <section className="w-full max-w-[1200px] mx-auto flex flex-col md:flex-row gap-6 sm:gap-8 mt-12 sm:mt-20 md:mt-40 px-4 sm:px-6">
+      
       {/* Ліва колонка з пронумерованим списком */}
-      <ol className="w-[494px] flex flex-col gap-10 font-bold text-[20px] text-black list-decimal list-inside">
+      <ol className="w-full md:w-[494px] flex flex-col gap-4 sm:gap-6 md:gap-10 font-bold text-base sm:text-[20px] text-black list-decimal list-inside">
         {topics.map((topic, index) => (
-          <li key={index} className="leading-tight">
+          <li key={index} className="leading-snug sm:leading-tight">
             {topic}
           </li>
         ))}
       </ol>
 
       {/* Права колонка з фото */}
-      <div className="w-[616px] h-[441px]">
+      <div className="w-full md:w-[616px] h-auto mt-6 md:mt-0">
         <img
-          src="images/img.png"
+          src="/images/img.png"
           alt="Marketing"
-          className="w-full h-auto mt-50" 
+          className="w-full h-auto rounded-lg"
         />
       </div>
     </section>
@@ -510,37 +481,40 @@ function CoursePreview() {
   useEffect(() => {
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % items.length);
-    }, 3000); // кожні 3с рухається
+    }, 3000);
     return () => clearInterval(interval);
   }, [items.length]);
 
   return (
-    <section className="w-[1200px] mx-auto flex flex-col items-center gap-35 py-70">
+    <section className="w-full max-w-[1200px] mx-auto flex flex-col items-center gap-8 sm:gap-12 py-12 sm:py-20">
+      
       {/* Заголовок */}
-      <div className="text-center mb-12">
-        <h2 className="text-[36px] font-bold text-black mb-2">
+      <div className="text-center mb-6 sm:mb-12 px-4">
+        <h2 className="text-2xl sm:text-3xl lg:text-[36px] font-bold text-black mb-1 sm:mb-2">
           Що чекає на вас на курсі
         </h2>
-        <h2 className="text-[36px] font-bold text-[#1345DE]">
+        <h2 className="text-2xl sm:text-3xl lg:text-[36px] font-bold text-[#1345DE]">
           “Комплексний інтернет-маркетинг”
         </h2>
       </div>
 
       {/* Карусель */}
-      <div className="relative w-[1040px] overflow-hidden">
+      <div className="relative w-full overflow-hidden px-4 sm:px-0">
         <div
           className="flex transition-transform duration-700 ease-in-out"
-          style={{ transform: `translateX(-${index * 426}px)` }}
+          style={{
+            transform: `translateX(-${index * (window.innerWidth <= 640 ? window.innerWidth - 32 : 412)}px)`,
+          }}
         >
           {items.map((item, i) => (
             <div
               key={i}
-              className="w-[406px] h-[406px] flex-shrink-0 flex flex-col justify-center items-center bg-white rounded-xl shadow-md p-6 mx-2 text-center"
+              className="flex-shrink-0 w-full sm:w-[406px] h-auto sm:h-[406px] flex flex-col justify-center items-center bg-white rounded-xl shadow-md p-4 sm:p-6 mx-2 text-center"
             >
-              <h3 className="font-bold text-[20px] mb-4 text-black">
+              <h3 className="font-bold text-lg sm:text-[20px] mb-2 sm:mb-4 text-black">
                 {item.title}
               </h3>
-              <p className="font-medium text-[16px] text-gray-700">
+              <p className="font-medium text-sm sm:text-[16px] text-gray-700 break-words">
                 {item.text}
               </p>
             </div>
@@ -549,64 +523,69 @@ function CoursePreview() {
       </div>
 
       {/* Кнопка */}
-      <button className="w-[424px] h-[68px] bg-[#1345DE] rounded-xl font-bold text-[20px] text-white">
-        Хочу стати інтернет-маркетологом
-      </button>
+      <div className="mt-6 sm:mt-12">
+        <button className="w-full sm:w-[424px] h-[52px] sm:h-[68px] bg-[#1345DE] rounded-xl font-bold text-base sm:text-[20px] text-white">
+          Хочу стати інтернет-маркетологом
+        </button>
+      </div>
     </section>
   );
 }
 
 function WorkshopBlock() {
   return (
-    <section className="w-full max-w-5xl mx-auto px-6 py-1">
+    <section className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-6 py-8 sm:py-12">
+      
       {/* Заголовок */}
-      <div className="text-center mb-30">
-        <h2 className="text-4xl font-bold text-black">
+      <div className="text-center mb-6 sm:mb-12">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-black">
           Додаткова практика з топовими експертами
         </h2>
-        <h3 className="text-4xl font-bold text-blue-600">
+        <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-blue-600 mt-2">
           10 занять (Workshop)
         </h3>
       </div>
 
       {/* Підзаголовок */}
-      <p className="text-3xl font-bold text-black mb-10 text-left">
+      <p className="text-lg sm:text-2xl lg:text-3xl font-bold text-black mb-6 sm:mb-10 text-center sm:text-left">
         Воркшопи: більше 40 годин прокачки навичок
       </p>
 
       {/* Іконки + текст */}
-      <div className="flex items-center gap-38 mb-28 text-black">
+      <div className="flex flex-col sm:flex-row items-center sm:items-start justify-center sm:justify-start gap-4 sm:gap-16 mb-8 sm:mb-12 text-black">
         <div className="flex items-center gap-2">
-          <Calendar className="w-8 h-8" />
-          <span className="text-2xl font-medium">Субота</span>
+          <Calendar className="w-6 h-6 sm:w-8 sm:h-8" />
+          <span className="text-base sm:text-2xl font-medium">Субота</span>
         </div>
         <div className="flex items-center gap-2">
-          <Clock className="w-8 h-8" />
-          <span className="text-2xl font-medium">11:00 - 15:00</span>
+          <Clock className="w-6 h-6 sm:w-8 sm:h-8" />
+          <span className="text-base sm:text-2xl font-medium">11:00 - 15:00</span>
         </div>
       </div>
 
       {/* Додатковий текст */}
-      <div className="text-left">
-        <p className="text-3xl font-bold mb-10">10 занять Workshop</p>
-        <p className="text-3xl font-medium text-gray-800">
+      <div className="text-center sm:text-left mb-6 sm:mb-10">
+        <p className="text-lg sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-10">
+          10 занять Workshop
+        </p>
+        <p className="text-base sm:text-2xl lg:text-3xl font-medium text-gray-800 mb-1">
           Кількість місць обмежена. Можливість участі 
         </p>
-        <p className="text-3xl font-medium text-gray-800">
+        <p className="text-base sm:text-2xl lg:text-3xl font-medium text-gray-800">
           уточнюйте у менеджера.
         </p>
       </div>
 
       {/* Блок з ZOOM */}
-      <div className="mt-20 w-[298px] h-[60px] flex items-center gap-4 rounded-[10px] bg-[#82A1FF99] px-4">
-        <Video className="w-10 h-10 text-[#0A2578]" />
-        <span className="text-[19px] font-bold leading-none text-[#0A2578]">
+      <div className="mt-6 sm:mt-8 w-full max-w-[298px] h-[60px] flex items-center gap-3 sm:gap-4 rounded-[10px] bg-[#82A1FF99] px-4 mx-auto sm:mx-0">
+        <Video className="w-8 h-8 sm:w-10 sm:h-10 text-[#0A2578]" />
+        <span className="text-sm sm:text-[19px] font-bold leading-none text-[#0A2578]">
           ПРОХОДИТЬ У ZOOM
         </span>
       </div>
 
       {/* Текстовий опис під блоком */}
-      <p className="mt-20 w-[656px] text-[20px] font-medium leading-tight text-black">
+      <p className="mt-6 sm:mt-8 w-full sm:max-w-[656px] text-base sm:text-[20px] font-medium leading-relaxed text-black mx-auto sm:mx-0">
         Учасники працюють у групах над власними завданнями під керівництвом
         викладача. Ви отримуєте практичний досвід і цінний зворотний зв’язок від
         експерта. Завдання максимально наближені до реальних професійних
@@ -618,74 +597,75 @@ function WorkshopBlock() {
 
 function SkillsSection() {
   return (
-    <section className="w-full max-w-5xl mx-auto px-6 py-30">
+    <section className="w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-6 py-8 sm:py-12">
+      
       {/* Перший ряд - 3 елементи */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-80 justify-items-center mb-20">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-12 lg:gap-20 justify-items-center mb-8 sm:mb-12 lg:mb-20">
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <BarChart className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <BarChart className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Аналітика</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Аналітика</p>
         </div>
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Youtube className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Youtube className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">YouTube</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">YouTube</p>
         </div>
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Search className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Search className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">SEO-просування</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">SEO-просування</p>
         </div>
       </div>
 
       {/* Другий ряд - 2 елементи */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 justify-items-center mb-20">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-12 justify-items-center mb-8 sm:mb-12">
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Lightbulb className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Lightbulb className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Контекстна реклама</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Контекстна реклама</p>
         </div>
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Target className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Target className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Аналіз ринку, конкурентів та ЦА</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Аналіз ринку, конкурентів та ЦА</p>
         </div>
       </div>
 
       {/* Третій ряд - 3 елементи */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-80 justify-items-center mb-20">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-12 lg:gap-20 justify-items-center mb-8 sm:mb-12 lg:mb-20">
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <MonitorCheck className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <MonitorCheck className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Таргетована реклама</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Таргетована реклама</p>
         </div>
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Mail className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Mail className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Email-маркетинг</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Email-маркетинг</p>
         </div>
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Puzzle className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Puzzle className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">Стратегія</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">Стратегія</p>
         </div>
       </div>
 
       {/* Четвертий ряд - 1 елемент */}
-      <div className="flex justify-center">
+      <div className="flex justify-center mb-8 sm:mb-12">
         <div className="flex flex-col items-center">
-          <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full bg-[#82A1FF99]">
-            <Megaphone className="w-[100px] h-[100px] text-[#0A2578]" />
+          <div className="w-36 h-36 sm:w-44 sm:h-44 flex items-center justify-center rounded-full bg-[#82A1FF99]">
+            <Megaphone className="w-20 h-20 sm:w-24 sm:h-24 text-[#0A2578]" />
           </div>
-          <p className="mt-4 text-lg font-bold text-black text-center">SMM</p>
+          <p className="mt-2 sm:mt-4 text-base sm:text-lg font-bold text-black text-center">SMM</p>
         </div>
       </div>
     </section>
@@ -937,17 +917,13 @@ function TrainingSection() {
   ];
 
   return (
-    <section className="w-full flex flex-col items-center py-20">
+    <section className="w-full flex flex-col items-center py-20 px-4 sm:px-6">
       {/* Заголовок */}
       <div className="text-center mb-20">
-        <p
-          className="font-[Afacad] font-bold text-[64px] leading-[100%] text-black"
-        >
+        <p className="font-[Afacad] font-bold text-[64px] leading-[100%] text-black">
           Наші навчальні
         </p>
-        <p
-          className="font-[Afacad] font-bold text-[64px] leading-[100%] text-[#82A1FF] mb-10"
-        >
+        <p className="font-[Afacad] font-bold text-[64px] leading-[100%] text-[#82A1FF] mb-10">
           програми проходять
         </p>
         <p className="font-[Afacad] font-bold text-[23px] leading-[100%] text-black">
@@ -955,16 +931,27 @@ function TrainingSection() {
         </p>
       </div>
 
-      {/* Ряд картинок */}
-      <div className="grid grid-cols-4 gap-15 mb-15">
+      {/* Перший ряд картинок */}
+      <div className="grid grid-cols-4 gap-4 sm:gap-6 mb-15 w-full max-w-[1200px]">
         {imagesRow1.map((src, i) => (
-          <img key={i} src={src} alt={`img${i + 1}`} className="w-[250px] h-[163px] object-contain" />
+          <img
+            key={i}
+            src={src}
+            alt={`img${i + 1}`}
+            className="w-[250px] h-[163px] object-contain mx-auto"
+          />
         ))}
       </div>
 
-      <div className="grid grid-cols-4 gap-15 mb-15">
+      {/* Другий ряд картинок */}
+      <div className="grid grid-cols-4 gap-4 sm:gap-6 mb-15 w-full max-w-[1200px]">
         {imagesRow2.map((src, i) => (
-          <img key={i} src={src} alt={`img${i + 5}`} className="w-[250px] h-[163px] object-contain" />
+          <img
+            key={i}
+            src={src}
+            alt={`img${i + 5}`}
+            className="w-[250px] h-[163px] object-contain mx-auto"
+          />
         ))}
       </div>
     </section>
@@ -979,122 +966,205 @@ function InstallmentSection() {
   ];
 
   return (
-    <section className="w-full flex flex-col items-center py-20">
+    <section className="w-full flex flex-col items-center py-10 px-4 sm:px-6">
       {/* Заголовок */}
-      <h2
-        className="font-[Afacad] font-bold text-[64px] leading-[100%] text-black text-center mb-6"
-        style={{ width: "838px", height: "85px" }}
-      >
+      <h2 className="font-[Afacad] font-bold text-3xl sm:text-5xl lg:text-[64px] leading-snug sm:leading-tight lg:leading-[100%] text-black text-center mb-6">
         Розстрочка без переплат
       </h2>
 
       {/* Основний текст */}
-      <p
-        className="font-[Mulish] font-medium text-[24px] leading-[100%] text-center mb-30"
-        style={{ width: "976px", height: "60px" }}
-      >
+      <p className="font-[Mulish] font-medium text-sm sm:text-lg lg:text-[24px] leading-snug text-center mb-6 sm:mb-10">
         Почніть навчатися вже зараз, а оплату вносьте частинами. Комфортний формат{" "}
         <span className="text-[#82A1FF]">до 5 місяців*</span>
       </p>
 
       {/* Кнопка */}
-      <button
-        className="font-[Afacad] font-bold text-[40px] text-[#FFFFFF] text-center py-1 px-10 rounded-[10px] mt-6"
-        style={{ width: "582px", height: "67px", backgroundColor: "#1345DE" }}
-      >
+      <button className="font-[Afacad] font-bold text-lg sm:text-2xl lg:text-[40px] text-white text-center py-3 px-6 sm:px-10 rounded-[10px] mt-4 sm:mt-6 bg-[#1345DE] w-full max-w-[400px] sm:max-w-[582px]">
         Як сплатити частинами?
       </button>
 
       {/* Пункти */}
-      <ul className="mt-20 space-y-4 w-[800px] ml-auto mr-auto text-left">
+      <ul className="mt-10 sm:mt-20 space-y-3 sm:space-y-4 w-full max-w-[95%] sm:max-w-[800px] text-left">
         {steps.map((step, i) => (
-          <li
-            key={i}
-            className="font-[Mulish] font-bold text-[24px] leading-[100%] text-black flex items-start gap-5"
-          >
-            <span className="w-2 h-2 mt-3 bg-black rounded-full flex-shrink-0"></span>
+          <li key={i} className="font-[Mulish] font-bold text-sm sm:text-lg lg:text-[24px] leading-snug text-black flex items-start gap-3 sm:gap-5">
+            <span className="w-2 h-2 mt-2 sm:mt-3 bg-black rounded-full flex-shrink-0"></span>
             {step}
           </li>
         ))}
       </ul>
 
       {/* Лінія знизу */}
-      <div
-        className="mt-40"
-        style={{
-          width: "1040px",
-          borderTop: "1px solid #000000",
-        }}
-      ></div>
+      <div className="mt-10 sm:mt-40 w-full max-w-[95%] sm:max-w-[1040px] border-t border-black"></div>
     </section>
   );
 }
 
 function BookingSection() {
+  const API_URL =
+    process.env.NEXT_PUBLIC_CONTACTS_API ||
+    "https://brainboost.pp.ua/api/api/contacts/";
+
+  const [form, setForm] = React.useState({ name: "", email: "", phone: "" });
+  const [loading, setLoading] = React.useState(false);
+  const [status, setStatus] = React.useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm((s) => ({ ...s, [name]: value }));
+    setStatus(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus(null);
+
+    if (!form.name.trim() || (!form.email.trim() && !form.phone.trim())) {
+      setStatus({
+        type: "error",
+        message: "Вкажіть ім’я та щонайменше email або телефон.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          topic: "Заявка: Курс (BookingSection)",
+          message:
+            'Заявка з форми "Записатися на курс". Користувач хоче забронювати місце/отримати консультацію.',
+        }),
+      });
+
+      if (res.ok) {
+        setStatus({
+          type: "success",
+          message: "Дякуємо! Ми зв’яжемось із вами найближчим часом.",
+        });
+        setForm({ name: "", email: "", phone: "" });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setStatus({
+          type: "error",
+          message: "Помилка відправки: " + ((data as any)?.error || res.status),
+        });
+      }
+    } catch {
+      setStatus({
+        type: "error",
+        message: "Помилка з’єднання з сервером. Спробуйте ще раз.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <section className="booking-section flex flex-col items-center py-20">
+    <section
+      id="signup"
+      className="booking-section flex flex-col items-center py-10 px-4 sm:px-6"
+    >
       {/* Заголовок */}
-      <h2 className="text-[48px] font-bold font-[Afacad] leading-tight max-w-[1040px] text-center mb-12">
-        Щоб <span className="text-[#1345DE]">забронювати ціну зі знижкою</span><br />
-        та підключитися до лімітованої групи,<br />
+      <h2 className="text-2xl sm:text-4xl lg:text-[48px] font-bold font-[Afacad] leading-snug sm:leading-tight lg:leading-tight text-center mb-6 sm:mb-12 max-w-full">
+        Щоб <span className="text-[#1345DE]">забронювати ціну зі знижкою</span>
+        <br />
+        та підключитися до лімітованої групи,
+        <br />
         заповніть форму
       </h2>
 
       {/* Синій блок */}
-      <div className="relative mt-10 w-[850px] rounded-[30px] bg-[#82A1FF] shadow-[9px_-9px_10px_rgba(0,0,0,0.25),-9px_9px_10px_rgba(0,0,0,0.25)] flex gap-10 p-16 justify-center">
-        
+      <div className="relative mt-6 sm:mt-10 w-full max-w-[95%] sm:max-w-[850px] rounded-[30px] bg-[#82A1FF] shadow-[9px_-9px_10px_rgba(0,0,0,0.25),-9px_9px_10px_rgba(0,0,0,0.25)] flex flex-col sm:flex-row gap-6 sm:gap-10 p-6 sm:p-16 justify-center">
         {/* Пігулки */}
-        <div className="absolute w-[210px] h-[89px] bg-transparent border border-[#0A25784A] rounded-[48px] rotate-[-30deg] -top-8 left-[200px]"></div>
-        <div className="absolute w-[144px] h-[91px] bg-transparent border border-[#0A25784A] rounded-[48px] rotate-[45deg] bottom-4 right-8"></div>
+        <div className="absolute w-36 h-20 border border-[#0A25784A] rounded-[48px] rotate-[-30deg] -top-4 left-12 sm:left-[200px]"></div>
+        <div className="absolute w-36 h-20 border border-[#0A25784A] rounded-[48px] rotate-[45deg] bottom-2 right-4 sm:right-8"></div>
 
         {/* Ліва частина */}
-        <div className="flex flex-col max-w-[320px] relative z-30 pt-12">
-          {/* додано pt-12 щоб опустити тексти вниз */}
-          <div className="w-[320px] h-[100px] bg-[#0A2578] text-white font-[Afacad] font-bold text-[32px] rounded-[10px] flex items-center justify-center text-left mb-4">
-            Забронювати<br />місце на курсі
+        <div className="flex flex-col max-w-full sm:max-w-[320px] relative z-30 pt-4 sm:pt-12">
+          <div className="w-full sm:w-[320px] h-[100px] bg-[#0A2578] text-white font-[Afacad] font-bold text-lg sm:text-[32px] rounded-[10px] flex items-center justify-center text-left mb-4 p-2 sm:p-0">
+            Забронювати
+            <br />
+            місце на курсі
           </div>
-          <p className="text-white font-[Mulish] font-medium text-[18px] mb-3">
+          <p className="text-white font-[Mulish] font-medium text-[16px] sm:text-[18px] mb-2">
             Або отримати безкоштовну консультацію
           </p>
-          <p className="font-[Mulish] font-medium text-[18px] text-[#D4E3FF] mb-2">
+          <p className="font-[Mulish] font-medium text-[16px] sm:text-[18px] text-[#D4E3FF] mb-1">
             Заповнюй форму і отримай демо урок:
           </p>
-          <p className="text-white font-[Mulish] font-medium text-[18px]">
+          <p className="text-white font-[Mulish] font-medium text-[16px] sm:text-[18px]">
             Що таке ІМ, напрямки та що потребує ринок зараз?
           </p>
         </div>
 
         {/* Права частина: форма */}
-        <form className="flex flex-col gap-6 w-[400px] relative z-10">
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-col gap-4 sm:gap-6 w-full sm:w-[400px] relative z-10"
+          noValidate
+        >
           <input
+            name="name"
             type="text"
             placeholder="Імʼя та прізвище"
-            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[18px] border border-gray-300 bg-white"
+            value={form.name}
+            onChange={handleChange}
+            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[16px] sm:text-[18px] border border-gray-300 bg-white w-full"
+            autoComplete="name"
           />
           <input
+            name="email"
             type="email"
             placeholder="Email"
-            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[18px] border border-gray-300 bg-white"
+            value={form.email}
+            onChange={handleChange}
+            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[16px] sm:text-[18px] border border-gray-300 bg-white w-full"
+            autoComplete="email"
           />
           <input
+            name="phone"
             type="tel"
             placeholder="Телефон"
-            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[18px] border border-gray-300 bg-white"
+            value={form.phone}
+            onChange={handleChange}
+            className="h-[50px] rounded-[10px] px-4 font-[Mulish] text-[16px] sm:text-[18px] border border-gray-300 bg-white w-full"
+            autoComplete="tel"
           />
           <button
             type="submit"
-            className="w-[220px] h-[65px] rounded-[10px] bg-white border-[3px] border-[#1345DE] text-[#1345DE] font-[Mulish] font-bold text-[16px] text-center hover:bg-[#1345DE] hover:text-white transition-colors duration-300"
+            disabled={loading}
+            className="w-full sm:w-[220px] h-[50px] sm:h-[65px] rounded-[10px] bg-white border-[3px] border-[#1345DE] text-[#1345DE] font-[Mulish] font-bold text-[16px] sm:text-[16px] text-center hover:bg-[#1345DE] hover:text-white transition-colors duration-300"
           >
-            Записатися на курс
+            {loading ? "Надсилаю…" : "Записатися на курс"}
           </button>
-          <span className="text-white font-[Mulish] font-bold text-[16px] mt-2">
-            Залишилось 5 місць із 50
-          </span>
+
+          {status && (
+            <p
+              className={`text-[14px] sm:text-[14px] font-[Mulish] font-semibold px-2 sm:px-3 py-2 rounded-md ${
+                status.type === "success"
+                  ? "bg-green-100 text-green-800"
+                  : "bg-red-100 text-red-800"
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              {status.message}
+            </p>
+          )}
         </form>
       </div>
     </section>
   );
 }
+
 
 type FAQ = {
   question: string;
@@ -1132,122 +1202,55 @@ function FAQSection() {
   };
 
   return (
-    <section className="px-6 py-16">
+    <section className="px-4 sm:px-6 py-10 sm:py-16">
       {/* Заголовок */}
-      <h2 className="text-7xl font-bold text-center mb-12 leading-tight">
+      <h2 className="text-3xl sm:text-5xl lg:text-7xl font-bold text-center mb-6 sm:mb-12 leading-snug sm:leading-tight">
         Відповіді на
         <br />
         <span className="text-blue-600">поширені запитання</span>
       </h2>
 
       {/* FAQ блок */}
-      <div className="max-w-4xl mx-auto flex flex-col gap-4 mb-20">
+      <div className="max-w-full sm:max-w-4xl mx-auto flex flex-col gap-3 sm:gap-4 mb-10 sm:mb-20">
         {faqs.map((faq, index) => (
           <div
             key={index}
-            className="bg-white rounded-xl shadow-md p-5 cursor-pointer transition hover:shadow-lg"
+            className="bg-white rounded-xl shadow-md p-4 sm:p-5 cursor-pointer transition hover:shadow-lg"
             onClick={() => toggleFAQ(index)}
           >
             <div className="flex justify-between items-center">
-              <p className="text-lg font-bold">{faq.question}</p>
+              <p className="text-base sm:text-lg font-bold">{faq.question}</p>
               <ChevronDown
-                className={`transition-transform duration-300 ${
+                className={`w-5 h-5 sm:w-6 sm:h-6 transition-transform duration-300 ${
                   openIndex === index ? "rotate-180" : ""
                 }`}
               />
             </div>
             {openIndex === index && (
-              <p className="mt-3 text-gray-700 text-base">{faq.answer}</p>
+              <p className="mt-2 sm:mt-3 text-gray-700 text-sm sm:text-base">
+                {faq.answer}
+              </p>
             )}
           </div>
         ))}
       </div>
 
       {/* Call-to-Action */}
-      <div className="text-center mb-20">
-        <p className="text-6xl font-bold text-black leading-tight">
+      <div className="text-center mb-10 sm:mb-20">
+        <p className="text-2xl sm:text-4xl lg:text-6xl font-bold text-black leading-snug sm:leading-tight">
           Опануйте <br />
           <span className="text-blue-600">високооплачувану</span> <br />
           digital-професію з нуля
         </p>
         <button
-          className="mt-6 font-semibold text-blue-800 hover:bg-[#1345DE] hover:text-white transition"
-          style={{
-            width: "232px",
-            height: "73px",
-            border: "3px solid #1345DE",
-            borderRadius: "10px",
+          onClick={() => {
+            document.getElementById("signup")?.scrollIntoView({ behavior: "smooth" });
           }}
+          className="mt-4 sm:mt-6 font-semibold text-blue-800 hover:bg-[#1345DE] hover:text-white transition px-4 sm:px-6 py-2 sm:py-3 rounded-[10px] border-2 sm:border-3 border-[#1345DE]"
         >
           Стань інтернет-маркетологом
         </button>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-[#0A2578] text-white py-10 px-6 rounded-t-3xl">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Лого та адреса */}
-          <div>
-            <h3 className="text-xl font-bold mb-3">Brainboost</h3>
-            <p>Ukraine, Kyiv, вул. Bohdana Khmelnytskoho, 25А</p>
-            <div className="flex gap-3 mt-4 text-xl">
-              <i className="fab fa-facebook-f cursor-pointer hover:text-blue-400"></i>
-              <i className="fab fa-instagram cursor-pointer hover:text-pink-400"></i>
-              <i className="fab fa-youtube cursor-pointer hover:text-red-500"></i>
-              <i className="fab fa-tiktok cursor-pointer hover:text-gray-300"></i>
-            </div>
-          </div>
-
-          {/* Курси */}
-          <div>
-            <h4 className="font-semibold text-lg mb-3">Курси</h4>
-            <ul className="space-y-2">
-              <li>Маркетинг</li>
-              <li>Дизайн</li>
-              <li>Бізнес</li>
-              <li>IT</li>
-              <li>Фінанси</li>
-            </ul>
-          </div>
-
-          {/* Більше */}
-          <div>
-            <h4 className="font-semibold text-lg mb-3">Більше</h4>
-            <ul className="space-y-2">
-              <li>Відгуки</li>
-              <li>Питання та відповіді</li>
-              <li>Про нас</li>
-            </ul>
-          </div>
-
-          {/* Контакти */}
-          <div>
-            <h4 className="font-semibold text-lg mb-3">Контакти</h4>
-            <ul className="space-y-2">
-              <li>
-                Telegram:{" "}
-                <a
-                  href="https://t.me/BrainBoost_bot"
-                  className="underline hover:text-blue-400"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  https://t.me/BrainBoost_bot
-                </a>
-              </li>
-              <li>
-                Email:{" "}
-                <a
-                  href="mailto:info@BrainBoost.com"
-                  className="underline hover:text-blue-400"
-                >
-                  info@BrainBoost.com
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </footer>
     </section>
   );
 }
@@ -1277,6 +1280,7 @@ export default function MarketingPage() {
       <InstallmentSection />
       <BookingSection />
       <FAQSection />
+      <FooterCard/>
     </main>
   );
 }

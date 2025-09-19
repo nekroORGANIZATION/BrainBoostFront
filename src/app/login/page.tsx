@@ -3,6 +3,7 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 import http, { ME_URL, LOGIN_URL } from '@/lib/http';
 
@@ -104,9 +105,18 @@ export default function LoginPage() {
     <div className="flex h-screen overflow-hidden relative">
       {/* Ліва колонка */}
       <div className="w-full md:w-1/2 flex flex-col px-8 sm:px-12 lg:px-16 py-10">
-        <Link href="/" className="text-2xl font-extrabold text-blue-700 hover:underline mb-10">
-          BrainBoost
-        </Link>
+        <Link href="/" aria-label="На головну"
+        className="absolute left-6 top-6 z-50 inline-flex items-center
+             p-[2px] rounded-lg bg-white/90 ring-1 ring-black/5  hover:bg-white">
+        <Image
+          src="/images/logo.png"
+          alt="Brand logo"
+          width={262}
+          height={56}
+          priority
+          className="select-none"
+        />
+      </Link>
 
         <div className="max-w-md">
           <h1 className="text-4xl font-extrabold text-[#0B1120] mb-8">Вхід</h1>

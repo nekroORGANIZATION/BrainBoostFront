@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import Link from 'next/link';
 
 type Props = {
   onNext: () => void;
@@ -13,7 +14,19 @@ export default function RoleSelection({ onNext, updateData, currentRole }: Props
 
   return (
     <div className="relative flex flex-col items-center justify-center h-screen px-4 bg-white overflow-hidden">
-      <div className="absolute top-6 left-6 text-blue-900 font-bold text-lg">LOGO</div>
+      <Link href="/" aria-label="На головну"
+        className="absolute left-6 top-6 z-50 inline-flex items-center rounded-xl
+                  bg-white/70 backdrop-blur px-3 py-2 ring-1 ring-black/5 hover:bg-white/80">
+        <Image
+          src="/images/logo.png"        // або /logo.png
+          alt="Brand logo"
+          width={262}
+          height={56}
+          priority
+          className="select-none"
+        />
+      </Link>
+
 
       <div className="absolute bottom-0 left-0 w-[326px] h-[280px] bg-blue-600"
            style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)' }} />

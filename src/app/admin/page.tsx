@@ -1,12 +1,23 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
+import { motion } from 'framer-motion';
+import { Users, GraduationCap, UserCheck, ShieldCheck, LinkIcon, Clock, BookOpenText } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+/** ===================== CONFIG ===================== */
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api/';
 
-/** ===================== Types ===================== */
+/** ===================== TYPES ===================== */
+type Course = {
+  id: number;
+  title: string;
+  author?: { username: string };
+  students_count?: number;
+  status?: 'draft' | 'pending' | 'published';
+  created_at?: string;
+};
+
 type User = {
   id: number;
   username: string;
@@ -14,294 +25,302 @@ type User = {
   is_teacher?: boolean;
   is_superuser?: boolean;
   is_email_verified?: boolean;
-  date_joined?: string;
 };
 
-type AuthShape = {
-  isAuthenticated: boolean;
-  accessToken: string | null;
-  user?: { username?: string; is_superuser?: boolean } | null;
+type Summary = {
+  total_users: number;
+  total_courses: number;
+  total_teachers: number;
+  pending_reviews: number;
 };
 
-type BadgeTone = 'slate' | 'emerald' | 'rose' | 'amber';
+/** ===================== HELPERS ===================== */
+function fmt(num: number) {
+  return new Intl.NumberFormat('uk-UA').format(num);
+}
 
-/** ===================== UI small ===================== */
-function Card({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(' ');
+}
+
+/** ===================== REUSABLE UI ===================== */
+function Card(
+  { children, className = '', tone = 'surface' }: { children: React.ReactNode; className?: string; tone?: 'surface' | 'indigo' | 'violet' | 'emerald' | 'amber' },
+) {
+  const toneMap: Record<string, string> = {
+    surface: 'bg-white/80 backdrop-blur ring-1 ring-[#E5ECFF] shadow-[0_8px_24px_rgba(2,28,78,0.06)]',
+    indigo:
+      'bg-gradient-to-br from-indigo-50 to-indigo-100/70 ring-1 ring-indigo-100 shadow-[0_12px_28px_rgba(31,41,255,0.12)]',
+    violet:
+      'bg-gradient-to-br from-violet-50 to-fuchsia-100/60 ring-1 ring-fuchsia-100 shadow-[0_12px_28px_rgba(168,85,247,0.12)]',
+    emerald:
+      'bg-gradient-to-br from-emerald-50 to-teal-100/60 ring-1 ring-emerald-100 shadow-[0_12px_28px_rgba(16,185,129,0.12)]',
+    amber:
+      'bg-gradient-to-br from-amber-50 to-orange-100/60 ring-1 ring-amber-100 shadow-[0_12px_28px_rgba(245,158,11,0.12)]',
+  };
   return (
-    <div className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
+    <div className={cn('rounded-2xl transition-shadow duration-300 hover:shadow-[0_18px_40px_rgba(2,28,78,0.10)]', toneMap[tone], className)}>
       {children}
     </div>
   );
 }
 
-function Badge({
-  children,
-  tone = 'slate',
-}: {
-  children: React.ReactNode;
-  tone?: BadgeTone;
-}) {
-  const map: Record<BadgeTone, string> = {
-    slate: 'bg-slate-100 text-slate-700',
-    emerald: 'bg-emerald-100 text-emerald-700',
-    rose: 'bg-rose-100 text-rose-700',
-    amber: 'bg-amber-100 text-amber-800',
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[tone]}`}>
+function Button(
+  {
+    children,
+    href,
+    onClick,
+    size = 'md',
+    variant = 'primary',
+    className = '',
+    disabled,
+  }: {
+    children: React.ReactNode;
+    href?: string;
+    onClick?: () => void;
+    size?: 'sm' | 'md' | 'lg';
+    variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+    className?: string;
+    disabled?: boolean;
+  },
+) {
+  const base =
+    'inline-flex items-center gap-2 font-semibold rounded-xl transition-all active:scale-[.98] focus:outline-none focus:ring-4 ring-[#DDE7FF]';
+  const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5' } as const;
+  const variants = {
+    primary: 'bg-[#1345DE] text-white hover:bg-[#0f3ac0]',
+    secondary: 'bg-[#EEF3FF] text-[#1345DE] hover:bg-[#E2EBFF]',
+    outline: 'bg-white text-[#0F2E64] ring-1 ring-[#E5ECFF] hover:bg-[#F9FBFF] hover:ring-[#d7e3ff]',
+    ghost: 'text-[#2B50ED] hover:bg-[#F1F5FF] hover:text-[#1f3dc0]',
+  } as const;
+  const cls = cn(base, sizes[size], variants[variant], disabled && 'opacity-60', className);
+  return href ? (
+    <Link href={href} className={cls} onClick={onClick} aria-disabled={disabled}>
       {children}
-    </span>
+    </Link>
+  ) : (
+    <button className={cls} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
   );
+}
+
+function StatusPill({ status }: { status?: Course['status'] }) {
+  const map: Record<string, string> = {
+    draft: 'bg-slate-100 text-slate-700',
+    pending: 'bg-amber-100 text-amber-800',
+    published: 'bg-emerald-100 text-emerald-800',
+  };
+  const label = status === 'published' ? 'Опубліковано' : status === 'pending' ? 'На модерації' : 'Чернетка';
+  return <span className={cn('px-2 py-0.5 rounded-full text-xs font-semibold', map[status || 'draft'])}>{label}</span>;
 }
 
 function SkeletonRow() {
   return (
-    <tr className="animate-pulse">
-      <td className="py-3"><div className="h-3 w-16 bg-slate-200 rounded" /></td>
-      <td className="py-3"><div className="h-3 w-40 bg-slate-200 rounded" /></td>
-      <td className="py-3"><div className="h-3 w-48 bg-slate-200 rounded" /></td>
-      <td className="py-3"><div className="h-6 w-20 bg-slate-200 rounded-full" /></td>
-      <td className="py-3"><div className="h-6 w-20 bg-slate-200 rounded-full" /></td>
-      <td className="py-3"><div className="h-3 w-24 bg-slate-200 rounded" /></td>
-    </tr>
+    <div className="flex items-center justify-between py-3">
+      <div className="w-56 h-3 rounded bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 animate-[shimmer_1.8s_infinite]" />
+      <div className="w-24 h-6 rounded-full bg-slate-200" />
+      <style jsx>{`
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+        div[class*='animate-[shimmer'] { background-size: 200% 100%; }
+      `}</style>
+    </div>
   );
 }
 
-/** ===================== Page ===================== */
-export default function AdminUsersPage() {
-  const { isAuthenticated, user, accessToken } = useAuth() as AuthShape;
+function KPI({ label, value, Icon, tone = 'surface' }: { label: string; value: string; Icon: React.ElementType; tone?: 'surface' | 'indigo' | 'violet' | 'emerald' | 'amber' }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 120, damping: 16 }}>
+      <Card className="p-5 overflow-hidden relative" tone={tone}>
+        <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full opacity-20 blur-2xl bg-white" />
+        <div className="flex items-center gap-3 text-[#0F2E64] text-sm font-semibold">
+          <Icon className="h-4 w-4" /> {label}
+        </div>
+        <div className="text-[#1345DE] text-3xl font-extrabold leading-tight mt-1">{value}</div>
+      </Card>
+    </motion.div>
+  );
+}
 
+/** ===================== PAGE ===================== */
+export default function AdminDashboardPage() {
+  const [summary, setSummary] = useState<Summary>({ total_users: 0, total_courses: 0, total_teachers: 0, pending_reviews: 0 });
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  const [count, setCount] = useState<number | null>(null);
-
-  // filters
-  const [q, setQ] = useState('');
-  const [onlyTeachers, setOnlyTeachers] = useState(false);
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
-
-  const notLoggedIn = !isAuthenticated || !accessToken;
-  const notAdmin = !!user && !user.is_superuser;
+  const [pendingTeacherApps, setPendingTeacherApps] = useState<number>(0);
 
   useEffect(() => {
-    let cancelled = false;
-    if (notLoggedIn || notAdmin) {
-      setLoading(false);
-      return;
-    }
-
+    const ctrl = new AbortController();
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const headers: HeadersInit = {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: 'application/json',
-        };
-
-        // 1) Адмінський ендпоінт з пагінацією
-        const url = new URL(`${API_BASE}/admin_panel/api/users/all/`);
-        url.searchParams.set('page', String(page));
-        url.searchParams.set('page_size', String(pageSize));
-        const res = await fetch(url.toString(), { headers, cache: 'no-store' });
-
-        if (res.ok) {
-          // очікуємо або { results, count } або масив
-          const raw: unknown = await res.json();
-          const list = Array.isArray(raw) ? (raw as User[]) : ((raw as { results?: User[] }).results ?? []);
-          if (!cancelled) {
-            setUsers(list);
-            const maybeCount = (raw as { count?: number }).count;
-            setCount(typeof maybeCount === 'number' ? maybeCount : list.length);
-          }
-        } else {
-          // 2) Фолбек: публічний список
-          const res2 = await fetch(`${API_BASE}/api/users/`, { headers, cache: 'no-store' });
-          if (res2.ok) {
-            const raw2: unknown = await res2.json();
-            const list = Array.isArray(raw2) ? (raw2 as User[]) : ((raw2 as { results?: User[] }).results ?? []);
-            if (!cancelled) {
-              setUsers(list);
-              setCount(list.length);
-            }
-          } else {
-            throw new Error(`HTTP ${res.status}`);
-          }
+        const headers: HeadersInit = { Accept: 'application/json' };
+        const cRes = await fetch(`${API_BASE}/courses/`, { headers, cache: 'no-store', signal: ctrl.signal });
+        if (cRes.ok) {
+          const raw = await cRes.json();
+          const list: Course[] = Array.isArray(raw) ? raw : raw.results || [];
+          setCourses(list);
+          setSummary((s) => ({ ...s, total_courses: list.length }));
         }
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Не вдалося завантажити користувачів';
-        if (!cancelled) setError(message);
+        const uRes = await fetch(`${API_BASE}/admin_panel/api/users/all/`, { headers, cache: 'no-store', signal: ctrl.signal });
+        if (uRes.ok) {
+          const raw = await uRes.json();
+          const list: User[] = Array.isArray(raw) ? raw : raw.results || [];
+          setUsers(list);
+          setSummary((s) => ({ ...s, total_users: list.length, total_teachers: list.filter((u) => u.is_teacher).length }));
+        }
+        const tRes = await fetch(`${API_BASE}/admin_panel/api/teacher-applications/?status=pending`, { headers, cache: 'no-store', signal: ctrl.signal });
+        if (tRes.ok) {
+          const raw = await tRes.json();
+          const count = typeof raw?.count === 'number' ? raw.count : Array.isArray(raw) ? raw.length : Array.isArray(raw?.results) ? raw.results.length : 0;
+          setPendingTeacherApps(count);
+        } else {
+          setPendingTeacherApps(0);
+        }
+        setSummary((s) => ({ ...s, pending_reviews: 7 }));
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') setError(e?.message || 'Не вдалося завантажити дані');
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     }
-
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, notLoggedIn, notAdmin, page]);
-
-  const filtered = useMemo(() => {
-    const ql = q.trim().toLowerCase();
-    let list = users;
-    if (ql) {
-      list = list.filter(
-        (u) =>
-          (u.username || '').toLowerCase().includes(ql) ||
-          (u.email || '').toLowerCase().includes(ql),
-      );
-    }
-    if (onlyTeachers) list = list.filter((u) => !!u.is_teacher);
-    return list;
-  }, [users, q, onlyTeachers]);
-
-  const totalPages = useMemo(() => {
-    const c = count ?? filtered.length;
-    return Math.max(1, Math.ceil(c / pageSize));
-  }, [count, filtered.length]);
-
-  if (notLoggedIn) {
-    return (
-      <main className="min-h-screen grid place-items-center">
-        <Card><h1>Потрібен вхід</h1></Card>
-      </main>
-    );
-  }
-
-  if (notAdmin) {
-    return (
-      <main className="min-h-screen grid place-items-center">
-        <Card><h1>Тільки для адмінів</h1></Card>
-      </main>
-    );
-  }
+    return () => ctrl.abort();
+  }, []);
 
   return (
-    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
-      <section className="w-[1280px] max-w-[95vw] mx-auto pt-[120px] pb-16">
-        <Card>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="min-h-screen relative bg-[url('/images/back.png')] bg-[radial-gradient(60%_50%_at_50%_-20%,#EAF0FF_0%,#FFFFFF_60%)] [mask-image:linear-gradient(to_bottom,rgba(0,0,0,0.9),rgba(0,0,0,1))]">
+      {/* Decorative blobs */}
+      <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/3 -right-24 h-72 w-72 rounded-full bg-fuchsia-200/40 blur-3xl" />
+
+      {/* HERO */}
+      <section className="w-[1280px] max-w-[95vw] mx-auto pt-20">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="rounded-3xl p-8 md:p-10 bg-gradient-to-br from-white/80 to-indigo-50/70 backdrop-blur ring-1 ring-[#E5ECFF] shadow-[0_8px_24px_rgba(2,28,78,0.06)]"
+        >
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-[#0F2E64]">Користувачі</h1>
-              <p className="text-slate-600 text-sm">Перелік зареєстрованих користувачів платформи</p>
+              <h1 className="text-[34px] md:text-[40px] font-extrabold text-[#021C4E] tracking-tight">Адмін панель</h1>
+              <p className="text-slate-600 mt-1">Керування платформою: курси, користувачі, відгуки, заявки.</p>
             </div>
-            <div className="flex gap-2 items-center">
-              <input
-                value={q}
-                onChange={(e) => { setQ(e.target.value); setPage(1); }}
-                placeholder="Пошук за ім'ям або email"
-                className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF] focus:outline-none"
-              />
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={onlyTeachers}
-                  onChange={(e) => { setOnlyTeachers(e.target.checked); setPage(1); }}
-                />
-                Лише викладачі
-              </label>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto mt-5">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 border-b">
-                  <th className="py-3">ID</th>
-                  <th className="py-3">Користувач</th>
-                  <th className="py-3">Email</th>
-                  <th className="py-3">Роль</th>
-                  <th className="py-3">Статус</th>
-                  <th className="py-3">Дата</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {loading ? (
-                  <>
-                    <SkeletonRow />
-                    <SkeletonRow />
-                    <SkeletonRow />
-                  </>
-                ) : filtered.length ? (
-                  filtered.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50/60">
-                      <td className="py-3">{u.id}</td>
-                      <td className="py-3">
-                        <div className="font-semibold text-[#0F2E64]">{u.username}</div>
-                      </td>
-                      <td className="py-3">{u.email || '—'}</td>
-                      <td className="py-3">
-                        {u.is_superuser ? (
-                          <Badge tone="rose">Адмін</Badge>
-                        ) : u.is_teacher ? (
-                          <Badge tone="emerald">Викладач</Badge>
-                        ) : (
-                          <Badge>Користувач</Badge>
-                        )}
-                      </td>
-                      <td className="py-3">
-                        {u.is_email_verified ? (
-                          <Badge tone="emerald">Пошта підтверджена</Badge>
-                        ) : (
-                          <Badge tone="amber">Очікує підтвердження</Badge>
-                        )}
-                      </td>
-                      <td className="py-3 text-slate-500">
-                        {u.date_joined ? new Date(u.date_joined).toLocaleDateString('uk-UA') : '—'}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">Нічого не знайдено</td>
-                  </tr>
+            <div className="flex flex-wrap gap-2">
+              <Button href="/admin/courses" variant="primary"><BookOpenText className="h-4 w-4" /> Курси</Button>
+              <Button href="/admin/users" variant="outline"><Users className="h-4 w-4" /> Користувачі</Button>
+              <Button href="/admin/reviews" variant="outline"><Clock className="h-4 w-4" /> Відгуки</Button>
+              <div className="relative">
+                <Button href="/admin/teachers" variant="secondary"><UserCheck className="h-4 w-4" /> Заявки викладачів</Button>
+                {pendingTeacherApps > 0 && (
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+                    title={`${pendingTeacherApps} нових заявок`}
+                    className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white"
+                  />
                 )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between mt-5">
-            <div className="text-xs text-slate-500">
-              Всього: {count ?? filtered.length}
-            </div>
-            <div className="flex gap-2">
-              <button
-                className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Назад
-              </button>
-              <div className="px-2 py-1 text-sm text-slate-600">
-                {page} / {totalPages}
               </div>
-              <button
-                className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                Далі
-              </button>
             </div>
           </div>
 
-          <div className="mt-6">
-            <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">← Повернутись назад</Link>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button href="/admin/categories" variant="ghost"><LinkIcon className="h-4 w-4" /> Категорії</Button>
+            <Button href="/admin/languages" variant="ghost"><LinkIcon className="h-4 w-4" /> Мови</Button>
           </div>
+        </motion.div>
+      </section>
 
-          {error ? <div className="mt-4 text-red-600 text-sm">{error}</div> : null}
+      {/* KPI (colored) */}
+      <section className="w-[1280px] max-w-[95vw] mx-auto mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPI label="Користувачів" value={fmt(summary.total_users)} Icon={Users} tone="indigo" />
+          <KPI label="Курсів" value={fmt(summary.total_courses)} Icon={GraduationCap} tone="violet" />
+          <KPI label="Викладачів" value={fmt(summary.total_teachers)} Icon={ShieldCheck} tone="emerald" />
+          <KPI label="Відгуків на модерації" value={fmt(summary.pending_reviews)} Icon={Clock} tone="amber" />
+        </div>
+      </section>
+
+      {/* TABLES */}
+      <section className="w-[1280px] max-w-[95vw] mx-auto mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6 pb-16">
+        {/* Courses */}
+        <Card className="p-5 bg-white/90" tone="surface">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[#0F2E64] font-bold text-lg">Останні курси</h2>
+            <Button href="/admin/courses" variant="ghost" size="sm">Всі курси →</Button>
+          </div>
+          <div className="divide-y mt-2">
+            {loading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : courses.length ? (
+              courses.slice(0, 5).map((c, i) => (
+                <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center justify-between py-3">
+                  <div>
+                    <div className="font-semibold">{c.title}</div>
+                    <div className="text-sm text-slate-600">Автор: {c.author?.username || '—'}</div>
+                  </div>
+                  <div className="flex gap-3 items-center">
+                    <StatusPill status={c.status} />
+                    <Button href={`/courses/${c.id}/details`} variant="ghost" size="sm">Переглянути</Button>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-sm text-slate-500 py-4">Поки що немає курсів</div>
+            )}
+          </div>
+        </Card>
+
+        {/* Users */}
+        <Card className="p-5 bg-white/90" tone="surface">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[#0F2E64] font-bold text-lg">Останні користувачі</h2>
+            <Button href="/admin/users" variant="ghost" size="sm">Всі користувачі →</Button>
+          </div>
+          <div className="divide-y mt-2">
+            {loading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : users.length ? (
+              users.slice(0, 5).map((u, i) => (
+                <motion.div key={u.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }} className="flex items-center justify-between py-3">
+                  <div>
+                    <div className="font-semibold">{u.username}</div>
+                    <div className="text-sm text-slate-600">{u.email || '—'}</div>
+                  </div>
+                  {u.is_teacher ? <span className="text-xs bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">Викладач</span> : null}
+                </motion.div>
+              ))
+            ) : (
+              <div className="text-sm text-slate-500 py-4">Поки що немає користувачів</div>
+            )}
+          </div>
         </Card>
       </section>
+
+      {error ? (
+        <section className="w-[1280px] max-w-[95vw] mx-auto pb-12">
+          <Card className="p-5 bg-red-50 ring-red-100">
+            <div className="text-red-700 text-sm">{error}</div>
+          </Card>
+        </section>
+      ) : null}
+
+      <style jsx global>{`
+        .btn-wiggle:hover { transform: translateY(-1px); }
+      `}</style>
     </main>
   );
 }

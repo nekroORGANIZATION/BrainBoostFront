@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import type { RegisterFormData } from './page';
+import Link from 'next/link';
+import Image from 'next/image';
 
 type Props = {
   onNext: () => void;
@@ -37,7 +39,18 @@ export default function UserDetailsForm({ onNext, onBack, updateData, values }: 
 
   return (
     <div className="relative min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="absolute top-8 left-8 text-xl font-bold text-blue-950">LOGO</div>
+      <Link href="/" aria-label="На головну"
+        className="absolute left-6 top-6 z-50 inline-flex items-center rounded-xl
+                  bg-white/70 backdrop-blur px-3 py-2 ring-1 ring-black/5 hover:bg-white/80">
+        <Image
+          src="/images/logo.png"
+          alt="Brand logo"
+          width={262}
+          height={56}
+          priority
+          className="select-none"
+        />
+      </Link>
       <div className="absolute top-36 left-0 w-64 h-64 bg-blue-600"
            style={{ clipPath: 'polygon(0 0, 100% 0, 0 100%)' }} />
 

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import FooterCard from '@/components/FooterCard';
 
 /* ================= ROOT STYLES (токени + утиліти + фон сторінки) ================= */
 function RootStyles() {
@@ -68,7 +69,6 @@ function HeroSection() {
             <div className="stars" aria-label="Рейтинг 4.85">
               <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
             </div>
-            <p className="rating__text">4.85 із 5 (на основі 18 440 оцінок)</p>
           </div>
 
           <p className="lead">
@@ -453,74 +453,247 @@ function StudyFlowSection() {
 }
 
 /* ================= 7) SALARY ================= */
+/* ================= 7) SALARY ================= */
 function SalaryAndJobHelpSection() {
   const chartHeights = [88, 132, 108, 124, 102, 140];
 
   return (
-    <>
-      <section className="salary">
-        <div className="container salary__container">
-          <h2 className="salary__title">Скільки можна <span>заробляти?</span></h2>
+    <section className="salary">
+      <div className="container salary__container">
+        <h2 className="salary__title">
+          Скільки можна <span>заробляти?</span>
+        </h2>
 
-          <div className="salaryCard">
-            <div className="salaryTop">
-              <div className="panel panel--num"><div className="salaryNum">45&nbsp;000грн</div></div>
+        <div className="salaryCard">
+          <div className="salaryTop">
+            <div className="panel panel--num">
+              <div className="salaryNum">45&nbsp;000грн</div>
+            </div>
 
-              <div className="panel panel--chart">
-                <div className="chartTitle">Розподіл зарплат</div>
-                <div className="chart" role="img" aria-label="Гістограма розподілу зарплат">
-                  {chartHeights.map((h, i) => (<div className="sBar" style={{ height: h }} key={i} />))}
-                </div>
-                <div className="axis"><span>20&nbsp;000грн</span><span>132&nbsp;000грн</span></div>
+            <div className="panel panel--chart">
+              <div className="chartTitle">Розподіл зарплат</div>
+              <div
+                className="chart"
+                role="img"
+                aria-label="Гістограма розподілу зарплат"
+              >
+                {chartHeights.map((h, i) => (
+                  <div className="sBar" style={{ height: h }} key={i} />
+                ))}
+              </div>
+              <div className="axis">
+                <span>20&nbsp;000грн</span>
+                <span>132&nbsp;000грн</span>
               </div>
             </div>
+          </div>
 
-            <div className="tblWrap">
-              <table className="tbl">
-                <thead>
-                  <tr><th>Місто</th><th>Зарплата</th><th className="right">Зміни за рік</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>Вся Україна</td><td>45&nbsp;000грн</td><td className="right neg">−16%</td></tr>
-                  <tr><td>Дистанційно</td><td>62&nbsp;500грн</td><td className="right pos">+4%</td></tr>
-                </tbody>
-              </table>
-            </div>
+          <div className="tblWrap">
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Місто</th>
+                  <th>Зарплата</th>
+                  <th className="right">Зміни за рік</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Вся Україна</td>
+                  <td>45&nbsp;000грн</td>
+                  <td className="right neg">−16%</td>
+                </tr>
+                <tr>
+                  <td>Дистанційно</td>
+                  <td>62&nbsp;500грн</td>
+                  <td className="right pos">+4%</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
+      </div>
 
-        <style jsx>{`
-          .salary{
-            --card: #fff; --outline: #dadbdd; --rowline: #eef1f6; --ink: #1e1e1f; --muted: #6b7280;
-            --shadow: 0 24px 56px rgba(16,24,40,.12);
-            --barTop: #6f8cff; --barBottom: #aebfff; --pos: #19C37D; --neg: #EF4444;
-            padding: 64px 0 74px;
+      <style jsx>{`
+        .salary {
+          --card: #fff;
+          --outline: #dadbdd;
+          --rowline: #eef1f6;
+          --ink: #1e1e1f;
+          --muted: #6b7280;
+          --shadow: 0 24px 56px rgba(16, 24, 40, 0.12);
+          --barTop: #6f8cff;
+          --barBottom: #aebfff;
+          --pos: #19c37d;
+          --neg: #ef4444;
+          padding: 64px 0 74px;
+        }
+        .salary__container {
+          max-width: 1100px;
+        }
+        .salary__title {
+          text-align: center;
+          font-size: clamp(26px, 2.6vw, 34px);
+          font-weight: 900;
+          letter-spacing: -0.01em;
+          color: var(--ink);
+          margin: 0 0 26px;
+        }
+        .salary__title span {
+          color: var(--accent);
+        }
+        .salaryCard {
+          background: var(--card);
+          border-radius: 22px;
+          box-shadow: var(--shadow);
+          padding: 28px;
+        }
+        .salaryTop {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 26px;
+          margin-bottom: 26px;
+        }
+        .panel {
+          background: #fff;
+          border: 2px solid var(--outline);
+          border-radius: 20px;
+          padding: 28px 26px;
+        }
+        .panel--num {
+          display: grid;
+          place-items: center;
+          min-height: 240px;
+        }
+        .salaryNum {
+          font-size: clamp(48px, 5.6vw, 64px);
+          line-height: 1;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          color: var(--ink);
+        }
+        .panel--chart {
+          padding-top: 20px;
+        }
+        .chartTitle {
+          text-align: center;
+          font-weight: 900;
+          font-size: 18px;
+          color: var(--ink);
+          margin-bottom: 14px;
+        }
+        .chart {
+          height: 188px;
+          display: flex;
+          align-items: flex-end;
+          justify-content: space-between;
+          gap: 18px;
+          padding: 16px 18px 12px;
+          background: #eef3ff;
+          border: 2px solid var(--outline);
+          border-radius: 14px;
+        }
+        .sBar {
+          width: 44px;
+          border-radius: 12px;
+          background: linear-gradient(180deg, var(--barTop), var(--barBottom));
+          box-shadow: 0 8px 16px rgba(109, 137, 255, 0.22),
+            inset 0 -4px 0 rgba(255, 255, 255, 0.65);
+        }
+        .axis {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          color: #5b6b8a;
+          margin-top: 8px;
+          padding: 0 2px;
+        }
+        .tblWrap {
+          border: 2px solid var(--outline);
+          border-radius: 20px;
+          overflow-x: auto; /* ✅ прокрутка на мобільних */
+          background: #fff;
+        }
+        .tbl {
+          width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          font-variant-numeric: tabular-nums;
+          min-width: 420px; /* ✅ щоб таблиця не ламалась */
+        }
+        .tbl thead th {
+          text-align: left;
+          font-weight: 900;
+          font-size: 17px;
+          padding: 18px 22px;
+          color: var(--ink);
+          background: #fff;
+          border-bottom: 2px solid var(--outline);
+        }
+        .tbl .right {
+          text-align: right;
+        }
+        .tbl tbody td {
+          padding: 22px 22px;
+          color: var(--ink);
+          background: #fff;
+          border-bottom: 1.5px solid var(--rowline);
+        }
+        .tbl tbody tr:last-child td {
+          border-bottom: 0;
+        }
+        .tbl tbody td.pos {
+          color: var(--pos);
+          font-weight: 900;
+        }
+        .tbl tbody td.neg {
+          color: var(--neg);
+          font-weight: 900;
+        }
+        .tbl tbody tr:hover td {
+          background: #fafbff;
+        }
+
+        /* ✅ адаптивність */
+        @media (max-width: 980px) {
+          .salaryTop {
+            grid-template-columns: 1fr;
           }
-          .salary__container { max-width: 1100px; }
-          .salary__title{ text-align:center; font-size: clamp(26px,2.6vw,34px); font-weight:900; letter-spacing:-.01em; color:var(--ink); margin:0 0 26px; }
-          .salary__title span{ color:var(--accent); }
-          .salaryCard{ background:var(--card); border-radius:22px; box-shadow:var(--shadow); padding:28px; }
-          .salaryTop{ display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-bottom:26px; }
-          .panel{ background:#fff; border:2px solid var(--outline); border-radius:20px; padding:28px 26px; }
-          .panel--num{ display:grid; place-items:center; min-height:240px; }
-          .salaryNum{ font-size:clamp(48px,5.6vw,64px); line-height:1; font-weight:600; letter-spacing:-.02em; color:var(--ink); }
-          .panel--chart{ padding-top:20px; }
-          .chartTitle{ text-align:center; font-weight:900; font-size:18px; color:var(--ink); margin-bottom:14px; }
-          .chart{ height:188px; display:flex; align-items:flex-end; justify-content:space-between; gap:18px; padding:16px 18px 12px; background:#eef3ff; border:2px solid var(--outline); border-radius:14px; }
-          .sBar{ width:44px; border-radius:12px; background:linear-gradient(180deg, var(--barTop), var(--barBottom)); box-shadow:0 8px 16px rgba(109,137,255,.22), inset 0 -4px 0 rgba(255,255,255,.65); }
-          .axis{ display:flex; justify-content:space-between; font-size:13px; color:#5b6b8a; margin-top:8px; padding:0 2px; }
-          .tblWrap{ border:2px solid var(--outline); border-radius:20px; overflow:hidden; background:#fff; }
-          .tbl{ width:100%; border-collapse:separate; border-spacing:0; font-variant-numeric:tabular-nums; }
-          .tbl thead th{ text-align:left; font-weight:900; font-size:17px; padding:18px 22px; color:var(--ink); background:#fff; border-bottom:2px solid var(--outline); }
-          .tbl .right{ text-align:right; }
-          .tbl tbody td{ padding:22px 22px; color:var(--ink); background:#fff; border-bottom:1.5px solid var(--rowline); }
-          .tbl tbody tr:last-child td{ border-bottom:0; }
-          .tbl tbody td.pos{ color:var(--pos); font-weight:900; } .tbl tbody td.neg{ color:var(--neg); font-weight:900; }
-          .tbl tbody tr:hover td{ background:#fafbff; }
-          @media (max-width:980px){ .salaryTop{ grid-template-columns:1fr; } .panel--num{ min-height:210px; } }
-        `}</style>
-      </section>
-    </>
+          .panel--num {
+            min-height: 180px;
+          }
+          .chart {
+            height: 150px;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .salaryCard {
+            padding: 20px;
+          }
+          .panel {
+            padding: 20px 18px;
+          }
+          .salaryNum {
+            font-size: 36px;
+          }
+          .chartTitle {
+            font-size: 16px;
+          }
+          .sBar {
+            width: 28px;
+          }
+          .axis {
+            font-size: 12px;
+          }
+          .tbl thead th,
+          .tbl tbody td {
+            padding: 14px 16px;
+            font-size: 14px;
+          }
+        }
+      `}</style>
+    </section>
   );
 }
 
@@ -569,46 +742,73 @@ function PartnersSection() {
   return (
     <section className="ps">
       <div className="container container--narrow ps__wrap">
-        <h2 className="ps__title">Наші навчальні <span>програми проходять</span></h2>
-        <p className="ps__sub">власники, керівники та співробітники провідних компаній</p>
+        <h2 className="ps__title">
+          Наші навчальні <span>програми проходять</span>
+        </h2>
+        <p className="ps__sub">
+          власники, керівники та співробітники провідних компаній
+        </p>
 
         <div className="ps__logos">
-          <div className="lg lg1"><Image src="/images/partner-01.png" alt="" fill sizes="180px" /></div>
-          <div className="lg lg2"><Image src="/images/partner-02.png" alt="" fill sizes="126px" /></div>
-          <div className="lg lg3"><Image src="/images/partner-03.png" alt="" fill sizes="126px" /></div>
-          <div className="lg lg4"><Image src="/images/partner-04.png" alt="" fill sizes="320px" /></div>
-          <div className="lg lg5"><Image src="/images/partner-05.png" alt="" fill sizes="190px" /></div>
-          <div className="lg lg6"><Image src="/images/img6.png" alt="" fill sizes="126px" /></div>
-          <div className="lg lg7"><Image src="/images/partner-07.png" alt="" fill sizes="230px" /></div>
-          <div className="lg lg8"><Image src="/images/partner-08.png" alt="" fill sizes="244px" /></div>
+          <div className="lg"><Image src="/images/partner-01.png" alt="" fill sizes="180px" /></div>
+          <div className="lg"><Image src="/images/partner-02.png" alt="" fill sizes="126px" /></div>
+          <div className="lg"><Image src="/images/partner-03.png" alt="" fill sizes="126px" /></div>
+          <div className="lg"><Image src="/images/partner-04.png" alt="" fill sizes="320px" /></div>
+          <div className="lg"><Image src="/images/partner-05.png" alt="" fill sizes="190px" /></div>
+          <div className="lg"><Image src="/images/img6.png" alt="" fill sizes="126px" /></div>
+          <div className="lg"><Image src="/images/partner-07.png" alt="" fill sizes="230px" /></div>
+          <div className="lg"><Image src="/images/partner-08.png" alt="" fill sizes="244px" /></div>
         </div>
       </div>
 
       <style jsx>{`
         .ps { padding: 56px 0 48px; }
-        .ps__wrap { max-width: 1100px; }
-        .ps__title { text-align: center; font-weight: 900; letter-spacing: -0.01em; color: #0f1115; margin: 0 0 30px; font-size: clamp(28px, 3.2vw, 44px); line-height: 1.12; }
+        .ps__wrap { max-width: 1100px; margin: 0 auto; }
+        .ps__title { 
+          text-align: center; 
+          font-weight: 900; 
+          letter-spacing: -0.01em; 
+          color: #0f1115; 
+          margin: 0 0 30px; 
+          font-size: clamp(28px, 3.2vw, 44px); 
+          line-height: 1.12; 
+        }
         .ps__title span { color: var(--accent); }
-        .ps__sub { text-align: center; color: #1f2937; opacity: 0.85; margin: 0 0 72px; font-size: clamp(14px, 1.6vw, 16px); }
+        .ps__sub { 
+          text-align: center; 
+          color: #1f2937; 
+          opacity: 0.85; 
+          margin: 0 0 72px; 
+          font-size: clamp(14px, 1.6vw, 16px); 
+        }
 
-        .ps__logos { margin-top: 6px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 24px; row-gap: 28px; align-items: center; }
-        .lg { position: relative; } .lg :global(img) { object-fit: contain; }
+        /* Сітка 2×4 */
+        .ps__logos {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(2, auto);
+          gap: 28px 24px;
+          align-items: center;
+          justify-items: center;
+        }
 
-        .lg1 { grid-column: 1 / span 3; grid-row: 1; height: 63px; }
-        .lg2 { grid-column: 5 / span 2; grid-row: 1; height: 126px; }
-        .lg3 { grid-column: 7 / span 2; grid-row: 1; height: 126px; }
-        .lg4 { grid-column: 9 / span 4; grid-row: 1; height: 63px; }
-        .lg5 { grid-column: 1 / span 3; grid-row: 2; height: 71px; }
-        .lg6 { grid-column: 5 / span 2; grid-row: 2; height: 126px; }
-        .lg7 { grid-column: 7 / span 3; grid-row: 2; height: 59px; }
-        .lg8 { grid-column: 10 / span 3; grid-row: 2; height: 100px; }
+        .lg {
+          position: relative;
+          width: 100%;
+          max-width: 200px;
+          height: 100px;
+        }
+        .lg :global(img) { object-fit: contain; }
 
-        @media (max-width: 1024px) { .ps__logos { column-gap: 18px; row-gap: 22px; } }
         @media (max-width: 720px) {
           .ps { padding: 44px 0 40px; }
-          .ps__logos { grid-template-columns: repeat(6, 1fr); column-gap: 16px; row-gap: 18px; }
-          .lg1 { grid-column: 1 / span 6; } .lg2 { grid-column: 1 / span 3; } .lg3 { grid-column: 4 / span 3; } .lg4 { grid-column: 1 / span 6; }
-          .lg5 { grid-column: 1 / span 6; } .lg6 { grid-column: 1 / span 3; } .lg7 { grid-column: 4 / span 3; } .lg8 { grid-column: 1 / span 6; }
+          .ps__sub { margin-bottom: 40px; }
+          .ps__logos {
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(4, auto);
+            gap: 20px 16px;
+          }
+          .lg { max-width: 160px; height: 80px; }
         }
       `}</style>
     </section>
@@ -664,7 +864,7 @@ function InstallmentSection() {
 
 /* ================= 11) CTA FORM ================= */
 function CTASection() {
-  const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'http://172.17.10.22:8000/api/contacts/';
+  const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'https://brainboost.pp.ua/api/api/contacts/';
   const [form, setForm] = React.useState({ name: '', email: '', phone: '' });
   const [loading, setLoading] = React.useState(false);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -748,46 +948,6 @@ function CTASection() {
   );
 }
 
-/* ================= 12) FOOTER ================= */
-function FooterSection() {
-  return (
-    <footer className="footer">
-      <div className="container footer__grid">
-        <div>
-          <div className="logoTxt">Brainboost</div>
-          <p className="muted small">Ukraine, Kyiv, вул. Вадима Гетьмана, 2Б</p>
-        </div>
-
-        <div className="footer__cols">
-          <div className="col">
-            <div className="col__title">Курси</div>
-            <ul><li><Link href="/courses">Всі курси</Link></li><li><Link href="/reviews">Відгуки</Link></li><li><Link href="#">Про індивідуальні</Link></li></ul>
-          </div>
-          <div className="col">
-            <div className="col__title">Кабінет</div>
-            <ul><li><Link href="/profile">Мій профіль</Link></li><li><Link href="/contacts">Контакти</Link></li><li><Link href="/about">Про нас</Link></li></ul>
-          </div>
-          <div className="col">
-            <div className="col__title">Контакти</div>
-            <ul><li><Link href="mailto:hello@brainboost.best">hello@brainboost.best</Link></li><li><Link href="mailto:info@brainboost.best">info@brainboost.best</Link></li></ul>
-          </div>
-        </div>
-      </div>
-
-      <style jsx>{`
-        .footer { background: #2836b3; color: #fff; padding: 26px 0; }
-        .footer__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-        .logoTxt { font-weight: 900; font-size: 20px; }
-        .footer__cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-        .col__title { font-weight: 700; margin-bottom: 6px; }
-        .footer a { color: #fff; text-decoration: none; }
-        .footer a:hover { text-decoration: underline; }
-        @media (max-width: 960px){ .footer__grid { grid-template-columns: 1fr; } }
-      `}</style>
-    </footer>
-  );
-}
-
 /* ================= PAGE COMPOSITION ================= */
 export default function CourseProgrammingPage() {
   return (
@@ -805,7 +965,7 @@ export default function CourseProgrammingPage() {
       <PartnersSection />
       <InstallmentSection />
       <CTASection />
-      <FooterSection />
+      <FooterCard/>
     </main>
   );
 }

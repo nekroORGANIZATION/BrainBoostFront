@@ -1,20 +1,19 @@
-// src/app/marketing/page.tsx
-// One-file landing page (Next.js App Router + TypeScript + TailwindCSS)
-// EXACT layout per provided screenshots; all images are placeholders referenced via constants below.
+'use client';
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import FooterCard from '@/components/FooterCard';
 
 // ===================== IMAGE CONSTANTS (replace with your files) =====================
 const IMAGES = {
   hero: "/images/designphoto.png",
-  who1: "/placeholders/who1.png",
-  who2: "/placeholders/who2.png",
-  who3: "/placeholders/who3.png",
-  who4: "/placeholders/who4.png",
-  who5: "/placeholders/who5.png",
-  who6: "/placeholders/who6.png",
-  mentor1: "/placeholders/mentor1.jpg",
-  mentor2: "/placeholders/mentor2.jpg",
+  who1: "/images/who1.png",
+  who2: "/images/who2.png",
+  who3: "/images/who3.png",
+  who4: "/images/who4.png",
+  who5: "/images/who5.png",
+  who6: "/images/who6.png",
+  mentor1: "/images/mentor1.png",
+  mentor2: "/images/mentor2.png",
 };
 
 // --- Small inline icons (no external libs) ---
@@ -39,24 +38,23 @@ const IconArrowRight = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 export default function Page() {
-  return (
-    <main className="min-h-dvh bg-[linear-gradient(180deg,#F0F6FF_0%,#EBF3FF_32%,#E9F1FF_60%,#F2F7FF_100%)] text-slate-900">
-      {/* ===================== NAVBAR ===================== */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-          <a href="#" className="flex items-center gap-2 font-black tracking-tight">
-            <span className="rounded-lg bg-slate-900 px-2 py-1 text-xs text-white">Brainboost</span>
-            <span className="hidden text-xs text-slate-500 sm:inline">Головна / Дизайн</span>
-          </a>
-          <nav className="hidden items-center gap-8 text-sm md:flex">
-            <a href="#mentors" className="text-slate-700 hover:text-indigo-700">Спікери</a>
-            <a href="#program" className="text-slate-700 hover:text-indigo-700">Програма</a>
-            <a href="#reviews" className="text-slate-700 hover:text-indigo-700">Відгуки</a>
-          </nav>
-          <a href="#form" className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-indigo-700">Записатися на курс</a>
-        </div>
-      </header>
+  const [animate, setAnimate] = useState(false);
 
+  useEffect(() => {
+    setAnimate(true);
+  }, []);
+
+  const chartData = [39, 52.5, 40]; // висоти стовпчиків пропорційно до зарплат
+  const cities = [
+    { city: "Вся Україна", salary: "39 000 грн", change: "+17%" },
+    { city: "Київ", salary: "52 500 грн", change: "+33%" },
+    { city: "Віддалено", salary: "40 000 грн", change: "+23%" },
+  ];
+
+  const maxHeight = Math.max(...chartData);
+
+  return (
+    <main className="min-h-dvh bg-[url('/images/back.png')] bg-top bg-cover text-slate-900">
       {/* ===================== HERO ===================== */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_60%_at_10%_10%,rgba(67,97,238,0.15),transparent_60%),radial-gradient(50%_60%_at_90%_20%,rgba(67,97,238,0.12),transparent_60%)]" />
@@ -74,9 +72,6 @@ export default function Page() {
               <div className="flex items-center gap-1 text-amber-400">
                 {Array.from({ length: 5 }).map((_, i) => (<IconStar key={i} className="h-6 w-6" />))}
               </div>
-              <div className="text-sm text-slate-700">
-                <span className="font-semibold">4.85</span> із 5 (на основі <span className="underline decoration-slate-300">18440</span> оцінок)
-              </div>
             </div>
             <p className="mt-4 max-w-xl text-slate-600">
               Навчіться створювати сучасні інтерфейси та працюй на міжнародних проєктах з доходом від 2000 $/міс.
@@ -85,7 +80,6 @@ export default function Page() {
               <a href="#form" className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700">
                 Записатися на курс <IconArrowRight className="h-4 w-4" />
               </a>
-              <div className="text-sm text-slate-600">Залишилось <span className="font-semibold">8</span> місць із 50</div>
             </div>
           </div>
           <div className="relative">
@@ -110,7 +104,7 @@ export default function Page() {
             <div key={c.title} className="relative overflow-hidden rounded-2xl bg-[linear-gradient(180deg,#2347F5_0%,#1D3FDB_100%)] p-5 text-white shadow-[0_16px_40px_rgba(29,63,219,0.3)] ring-1 ring-white/10">
               <div className="mb-2 text-base font-semibold leading-tight">{c.title}</div>
               <p className="max-w-[46ch] text-sm text-indigo-100">{c.text}</p>
-              <img src={c.img} alt="" className="absolute -right-2 -bottom-2 h-14 w-14 opacity-90" />
+              <img src={c.img} alt="" className="absolute -right-2 -bottom-2 h-32 w-32 opacity-90" />
             </div>
           ))}
         </div>
@@ -258,31 +252,68 @@ export default function Page() {
       </section>
 
       {/* ===================== SALARY ===================== */}
-      <section className="mx-auto max-w-7xl px-4 py-12">
-        <h2 className="text-center text-2xl font-extrabold tracking-tight sm:text-3xl">Скільки можна <span className="text-indigo-700">заробляти</span></h2>
-        <div className="mx-auto mt-8 max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-slate-200 p-6 text-center">
-              <div className="text-3xl font-black">39 000грн</div>
-              <div className="mt-1 text-xs text-slate-500">Середня зарплатня</div>
+      <section className="w-full py-12 flex flex-col items-center">
+        <h2 className="text-5xl font-bold font-[Afacad] text-center mb-10">
+          Скільки можна <span className="text-blue-600">заробляти</span>
+        </h2>
+
+        <div className="bg-white border border-black/30 rounded-2xl shadow-lg p-10 w-[800px] max-w-full flex flex-col gap-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="border border-black/20 rounded-xl p-6 flex flex-col items-center justify-center">
+              <p className="text-5xl font-bold font-[Mulish] text-black mb-3">
+                43 833 грн
+              </p>
+              <p className="text-base font-medium font-[Mulish] text-black">
+                Середня зарплатня
+              </p>
             </div>
-            <div className="rounded-xl border border-slate-200 p-4">
-              <div className="text-sm font-semibold">Розподіл зарплат</div>
-              <div className="mt-3 h-28 w-full rounded-lg bg-gradient-to-t from-indigo-200 to-indigo-100"></div>
-              <div className="mt-2 flex justify-between text-[11px] text-slate-500"><span>{"< 30 000"}</span><span>{"50 000+"}</span></div>
+
+            <div className="border border-black/20 rounded-xl p-6 flex flex-col items-center">
+              <p className="text-xl font-bold font-[Mulish] text-black mb-6">
+                Розподіл зарплат
+              </p>
+              <div className="flex items-end h-[130px] w-full justify-between">
+                {chartData.map((val, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 bg-[#82A1FF99] rounded-t-lg mx-[2px]"
+                    style={{
+                      height: animate ? `${(val / maxHeight) * 100}%` : "0%",
+                      transition: `height 0.6s ease ${i * 0.2}s`,
+                    }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between w-full mt-4 px-2">
+                <span className="text-sm font-[Mulish] text-black">&lt; 30 000</span>
+                <span className="text-sm font-[Mulish] text-black">50 000+</span>
+              </div>
+              <div className="flex justify-between w-full mt-2 px-2 text-sm font-[Mulish] text-black">
+                <span>Вся Україна</span>
+                <span>Київ</span>
+                <span>Віддалено</span>
+              </div>
             </div>
           </div>
-          <div className="mt-6 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="text-slate-500"><th className="py-2">Місто</th><th className="py-2">Зарплата</th><th className="py-2">Зміна за рік</th></tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {[["Вся Україна","39 000грн","+17%"],["Київ","52 500грн","+33%"],["Віддалено","40 000грн","+23%"]].map((row,i)=> (
-                  <tr key={i}><td className="py-2">{row[0]}</td><td className="py-2">{row[1]}</td><td className="py-2 text-emerald-600">{row[2]}</td></tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="rounded-xl border border-black/20 p-6">
+            <div className="grid grid-cols-3 text-center font-medium font-[Mulish] text-lg text-black mb-3">
+              <p>Місто</p>
+              <p>Зарплата</p>
+              <p>Зміна за рік</p>
+            </div>
+            <hr className="border border-black/70 mb-4" />
+
+            {cities.map((row, i) => (
+              <div key={i}>
+                <div className="grid grid-cols-3 text-center items-center py-3">
+                  <p className="text-lg font-bold text-black">{row.city}</p>
+                  <p className="text-lg font-bold text-black">{row.salary}</p>
+                  <p className="text-lg font-medium text-green-600">{row.change}</p>
+                </div>
+                {i !== cities.length - 1 && <hr className="border border-black/30" />}
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -308,16 +339,42 @@ export default function Page() {
       </section>
 
       {/* ===================== PARTNERS ===================== */}
-      <section className="mx-auto max-w-7xl px-4 py-12">
-        <h2 className="text-center text-2xl font-extrabold tracking-tight sm:text-3xl">Наші навчальні <span className="text-indigo-700">програми проходять</span></h2>
-        <div className="mx-auto mt-6 grid max-w-4xl grid-cols-3 items-center gap-6 sm:grid-cols-6">
-          {"1+1, monobank, 24, Samsung, ICTV, A‑bank".split(", ").map((p) => (
-            <div key={p} className="flex items-center justify-center rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-              <span className="text-sm font-semibold text-slate-700">{p}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      <section className="w-full flex flex-col items-center py-20">
+  {/* Заголовок */}
+  <div className="text-center mb-20 px-4">
+    <p className="font-[Afacad] font-bold text-[64px] leading-[100%] text-black">
+      Наші навчальні
+    </p>
+    <p className="font-[Afacad] font-bold text-[64px] leading-[100%] text-[#82A1FF] mb-10">
+      програми проходять
+    </p>
+    <p className="font-[Afacad] font-bold text-[23px] leading-[100%] text-black">
+      власники, керівники та співробітники провідних компаній
+    </p>
+  </div>
+
+  {/* Лого компаній */}
+  <div className="grid grid-cols-4 gap-10 w-full max-w-5xl px-4 sm:px-0">
+    {[
+      "/images/partner-01.png",
+      "/images/partner-02.png",
+      "/images/partner-03.png",
+      "/images/partner-04.png",
+      "/images/partner-05.png",
+      "/images/img6.png",
+      "/images/partner-07.png",
+      "/images/partner-08.png",
+    ].map((src, i) => (
+      <img
+        key={i}
+        src={src}
+        alt={`partner-logo-${i + 1}`}
+        className="w-full max-w-[200px] h-[120px] object-contain mx-auto"
+      />
+    ))}
+  </div>
+</section>
+
 
       {/* ===================== INSTALLMENT CTA ===================== */}
       <section className="mx-auto max-w-7xl px-4 py-12">
@@ -353,22 +410,7 @@ export default function Page() {
       </section>
 
       {/* ===================== FOOTER ===================== */}
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3">
-          <div>
-            <div className="inline-flex items-center gap-2"><span className="rounded-lg bg-slate-900 px-2 py-1 text-xs font-bold text-white">Brainboost</span><span className="text-sm font-semibold text-slate-700">Освітня платформа</span></div>
-            <p className="mt-2 text-sm text-slate-600">© {new Date().getFullYear()} Brainboost. Всі права захищені.</p>
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Контакти</div>
-            <ul className="mt-2 space-y-1 text-sm text-slate-600"><li>hello@brainboost.school</li><li>Київ, Україна</li></ul>
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Документи</div>
-            <ul className="mt-2 space-y-1 text-sm text-slate-600"><li>Публічна оферта</li><li>Політика конфіденційності</li><li>Умови користування</li></ul>
-          </div>
-        </div>
-      </footer>
+      <FooterCard/>
     </main>
   );
 }

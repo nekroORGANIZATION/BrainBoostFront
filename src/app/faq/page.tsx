@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import FooterCard from '@/components/FooterCard';
 
 // ===== Types =====
 type FAQItem = {
@@ -218,7 +219,7 @@ export default function FAQPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-center pb-20">
+    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-center">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
       {/* HERO */}
@@ -403,6 +404,7 @@ export default function FAQPage() {
           </div>
         </div>
       </section>
+      <FooterCard />
     </main>
   );
 }

@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
-import http, { API_BASE, ME_URL, LOGIN_URL } from '@/lib/http';
+import http, { API_BASE, ME_URL, LOGIN_URL, REFRESH_URL } from '@/lib/http';
 import { setAuthHeader } from '@/lib/http';
 
 /* =========================
@@ -84,6 +84,13 @@ function looksLikeJwt(t?: string | null) {
   return !!t && t.split('.').length === 3;
 }
 
+/** Визначаємо, чи "remember" був true, дивлячись де лежить refresh */
+function rememberFromRefreshStorage(): boolean {
+  if (!inBrowser) return true;
+  // якщо refresh у localStorage → remember = true, інакше (session) → false
+  return localStorage.getItem('refresh') != null;
+}
+
 /* =========================
    Provider
 ========================= */
@@ -93,16 +100,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [rememberFlag, setRememberFlag] = useState<boolean>(true);
   const [user, setUser]                 = useState<User | null>(null);
 
-  // 1) Старт: синхронно підхопити токени та ОДРАЗУ прокинути їх в axios через setAuthHeader
+  // 1) Старт: синхронно підхопити токени
   useEffect(() => {
     const a = readStored('access');
     const r = readStored('refresh');
+
     setAccessToken(a);
     setRefreshToken(r);
-    // якщо токен у localStorage — вважаємо "remember = true"
-    if (inBrowser) setRememberFlag(localStorage.getItem('access') != null);
-    // критично: відразу в http, щоб перші запити мали Authorization
+
+    // визначаємо remember за місцем зберігання refresh
+    if (inBrowser) setRememberFlag(rememberFromRefreshStorage());
+
+    // одразу прокидуємо в axios
     setAuthHeader(a || null);
+
+    // якщо access відсутній, але є refresh — спробуємо проактивно оновити токен
+    (async () => {
+      if (!a && r) {
+        try {
+          const res = await axios.post(`${API_BASE}${REFRESH_URL}`, { refresh: r });
+          const newAccess: string | null = res.data?.access || null;
+
+          if (newAccess && looksLikeJwt(newAccess)) {
+            const remember = rememberFromRefreshStorage();
+            writeStored('access', newAccess, remember);
+            setAuthHeader(newAccess);
+            setAccessToken(newAccess);
+            setRememberFlag(remember);
+          } else {
+            clearAllTokens();
+            setAuthHeader(null);
+            setAccessToken(null);
+            setRefreshToken(null);
+            setUser(null);
+          }
+        } catch {
+          clearAllTokens();
+          setAuthHeader(null);
+          setAccessToken(null);
+          setRefreshToken(null);
+          setUser(null);
+        }
+      }
+    })();
   }, []);
 
   // 2) Будь-яка зміна accessToken → оновлюємо заголовок інстанса
@@ -134,7 +174,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const password   = b ?? '';
       const rememberMe = !!remember;
 
-      // логінимось БЕЗ інтерцептора (через axios напряму або той же http — вже не принципово)
+      // логінимось БЕЗ інтерцептора (прямий виклик)
       const res  = await axios.post(`${API_BASE}${LOGIN_URL}`, { username, password });
       const data = res.data || {};
 

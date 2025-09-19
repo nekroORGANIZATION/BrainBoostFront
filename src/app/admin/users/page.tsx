@@ -4,49 +4,46 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+/** ===================== CONFIG ===================== */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? 'https://brainboost.pp.ua/api')
+  .replace(/\/+$/, ''); // убрать конечные слеши
 
-/** ===================== Types ===================== */
+/** ===================== TYPES ===================== */
 type User = {
   id: number;
   username: string;
-  email?: string;
+  email?: string | null;
   is_teacher?: boolean;
   is_superuser?: boolean;
   is_email_verified?: boolean;
-  date_joined?: string;
+  date_joined?: string | null;
 };
 
-type AuthShape = {
+type AuthCtx = {
   isAuthenticated: boolean;
   accessToken: string | null;
   user?: { username?: string; is_superuser?: boolean } | null;
 };
 
-type BadgeTone = 'slate' | 'emerald' | 'rose' | 'amber';
-
-/** ===================== UI small ===================== */
-function Card({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
+/** ===================== UI PRIMITIVES ===================== */
+type CardProps = { children: React.ReactNode; className?: string };
+function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
+    <div
+      className={[
+        'rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5',
+        'shadow-[0_8px_24px_rgba(2,28,78,0.06)]',
+        className,
+      ].join(' ')}
+    >
       {children}
     </div>
   );
 }
 
-function Badge({
-  children,
-  tone = 'slate',
-}: {
-  children: React.ReactNode;
-  tone?: BadgeTone;
-}) {
+type BadgeTone = 'slate' | 'emerald' | 'rose' | 'amber';
+type BadgeProps = { children: React.ReactNode; tone?: BadgeTone };
+function Badge({ children, tone = 'slate' }: BadgeProps) {
   const map: Record<BadgeTone, string> = {
     slate: 'bg-slate-100 text-slate-700',
     emerald: 'bg-emerald-100 text-emerald-700',
@@ -54,7 +51,10 @@ function Badge({
     amber: 'bg-amber-100 text-amber-800',
   };
   return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[tone]}`}>
+    <span
+      className={`px-2 py-0.5 rounded-full font-semibold text-xs sm:text-sm max-w-[120px] truncate ${map[tone]}`}
+      title={typeof children === 'string' ? children : undefined}
+    >
       {children}
     </span>
   );
@@ -73,16 +73,32 @@ function SkeletonRow() {
   );
 }
 
-/** ===================== Page ===================== */
+/** ===================== HELPERS ===================== */
+function joinUrl(...parts: string[]) {
+  return parts
+    .map((p, i) => (i === 0 ? p.replace(/\/+$/, '') : p.replace(/^\/+/, '')))
+    .join('/');
+}
+
+async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`);
+  }
+  return res.json();
+}
+
+/** ===================== PAGE ===================== */
 export default function AdminUsersPage() {
-  const { isAuthenticated, user, accessToken } = useAuth() as AuthShape;
+  const { isAuthenticated, user, accessToken } = useAuth() as AuthCtx;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [count, setCount] = useState<number | null>(null);
 
-  // filters
+  // filters / paging
   const [q, setQ] = useState('');
   const [onlyTeachers, setOnlyTeachers] = useState(false);
   const [page, setPage] = useState(1);
@@ -98,7 +114,7 @@ export default function AdminUsersPage() {
       return;
     }
 
-    async function load() {
+    (async () => {
       setLoading(true);
       setError(null);
       try {
@@ -107,44 +123,37 @@ export default function AdminUsersPage() {
           Accept: 'application/json',
         };
 
-        // 1) Адмінський ендпоінт з пагінацією
-        const url = new URL(`${API_BASE}/admin_panel/api/users/all/`);
+        // 1) Пробуем админский эндпойнт с пагинацией
+        const url = new URL(joinUrl(API_BASE, 'admin_panel/api/users/all/'));
         url.searchParams.set('page', String(page));
         url.searchParams.set('page_size', String(pageSize));
+
         const res = await fetch(url.toString(), { headers, cache: 'no-store' });
 
         if (res.ok) {
-          // очікуємо або { results, count } або масив
-          const raw: unknown = await res.json();
-          const list = Array.isArray(raw) ? (raw as User[]) : ((raw as { results?: User[] }).results ?? []);
+          const raw = await res.json();
+          const list: User[] = Array.isArray(raw) ? raw : raw.results || [];
           if (!cancelled) {
             setUsers(list);
-            const maybeCount = (raw as { count?: number }).count;
-            setCount(typeof maybeCount === 'number' ? maybeCount : list.length);
+            setCount(typeof raw?.count === 'number' ? raw.count : list.length);
           }
         } else {
-          // 2) Фолбек: публічний список
-          const res2 = await fetch(`${API_BASE}/api/users/`, { headers, cache: 'no-store' });
-          if (res2.ok) {
-            const raw2: unknown = await res2.json();
-            const list = Array.isArray(raw2) ? (raw2 as User[]) : ((raw2 as { results?: User[] }).results ?? []);
-            if (!cancelled) {
-              setUsers(list);
-              setCount(list.length);
-            }
-          } else {
-            throw new Error(`HTTP ${res.status}`);
+          // 2) Fallback: публичный список без пагинации
+          const fallbackUrl = joinUrl(API_BASE, 'api/users/');
+          const raw = await fetchJSON<unknown>(fallbackUrl, { headers, cache: 'no-store' });
+          const list: User[] = Array.isArray(raw) ? raw : (raw as any)?.results || [];
+          if (!cancelled) {
+            setUsers(list);
+            setCount(list.length);
           }
         }
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Не вдалося завантажити користувачів';
-        if (!cancelled) setError(message);
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Не вдалося завантажити користувачів');
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
+    })();
 
-    load();
     return () => {
       cancelled = true;
     };
@@ -169,26 +178,28 @@ export default function AdminUsersPage() {
     return Math.max(1, Math.ceil(c / pageSize));
   }, [count, filtered.length]);
 
+  /** ===== Guards ===== */
   if (notLoggedIn) {
     return (
       <main className="min-h-screen grid place-items-center">
-        <Card><h1>Потрібен вхід</h1></Card>
+        <Card><h1 className="text-lg font-bold text-[#0F2E64]">Потрібен вхід</h1></Card>
       </main>
     );
   }
-
   if (notAdmin) {
     return (
       <main className="min-h-screen grid place-items-center">
-        <Card><h1>Тільки для адмінів</h1></Card>
+        <Card><h1 className="text-lg font-bold text-[#0F2E64]">Тільки для адмінів</h1></Card>
       </main>
     );
   }
 
+  /** ===== Page ===== */
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
       <section className="w-[1280px] max-w-[95vw] mx-auto pt-[120px] pb-16">
         <Card>
+          {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-[#0F2E64]">Користувачі</h1>
@@ -197,7 +208,10 @@ export default function AdminUsersPage() {
             <div className="flex gap-2 items-center">
               <input
                 value={q}
-                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Пошук за ім'ям або email"
                 className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF] focus:outline-none"
               />
@@ -205,20 +219,24 @@ export default function AdminUsersPage() {
                 <input
                   type="checkbox"
                   checked={onlyTeachers}
-                  onChange={(e) => { setOnlyTeachers(e.target.checked); setPage(1); }}
+                  onChange={(e) => {
+                    setOnlyTeachers(e.target.checked);
+                    setPage(1);
+                  }}
                 />
                 Лише викладачі
               </label>
             </div>
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto mt-5">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-slate-500 border-b">
-                  <th className="py-3">ID</th>
-                  <th className="py-3">Користувач</th>
-                  <th className="py-3">Email</th>
+                  <th className="py-3 px-2 sm:px-3">ID</th>
+                  <th className="py-3 px-2 sm:px-3">Користувач</th>
+                  <th className="py-3 px-2 sm:px-3">Email</th>
                   <th className="py-3">Роль</th>
                   <th className="py-3">Статус</th>
                   <th className="py-3">Дата</th>
@@ -234,11 +252,11 @@ export default function AdminUsersPage() {
                 ) : filtered.length ? (
                   filtered.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50/60">
-                      <td className="py-3">{u.id}</td>
-                      <td className="py-3">
+                      <td className="py-3 px-2 sm:px-3">{u.id}</td>
+                      <td className="py-3 px-2 sm:px-3">
                         <div className="font-semibold text-[#0F2E64]">{u.username}</div>
                       </td>
-                      <td className="py-3">{u.email || '—'}</td>
+                      <td className="py-3 px-2 sm:px-3">{u.email || '—'}</td>
                       <td className="py-3">
                         {u.is_superuser ? (
                           <Badge tone="rose">Адмін</Badge>
@@ -256,13 +274,17 @@ export default function AdminUsersPage() {
                         )}
                       </td>
                       <td className="py-3 text-slate-500">
-                        {u.date_joined ? new Date(u.date_joined).toLocaleDateString('uk-UA') : '—'}
+                        {u.date_joined
+                          ? new Date(u.date_joined).toLocaleDateString('uk-UA')
+                          : '—'}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">Нічого не знайдено</td>
+                    <td colSpan={6} className="py-6 text-center text-slate-500">
+                      Нічого не знайдено
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -271,9 +293,7 @@ export default function AdminUsersPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between mt-5">
-            <div className="text-xs text-slate-500">
-              Всього: {count ?? filtered.length}
-            </div>
+            <div className="text-xs text-slate-500">Всього: {count ?? filtered.length}</div>
             <div className="flex gap-2">
               <button
                 className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
@@ -296,7 +316,9 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="mt-6">
-            <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">← Повернутись назад</Link>
+            <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">
+              ← Повернутись назад
+            </Link>
           </div>
 
           {error ? <div className="mt-4 text-red-600 text-sm">{error}</div> : null}

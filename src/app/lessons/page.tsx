@@ -1,139 +1,241 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import axios, { AxiosError } from 'axios';
-import TheoryEditor from '@/components/TheoryEditor';
-import { MessageSquare } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
+import axios from 'axios';
+import Link from 'next/link';
 
-export default function TheoryPage() {
-  const { id } = useParams(); // id уроку
-  const [content, setContent] = useState('<p>Завантаження...</p>');
-  const [theoryId, setTheoryId] = useState<number | null>(null);
+/* ---------- Types ---------- */
+interface Lesson {
+  id: number;
+  title: string;
+  summary: string;
+  status: 'draft' | 'scheduled' | 'published' | 'archived';
+  duration_min: number;
+  cover_image?: string | null;
+}
+
+/* ---------- UI Helpers ---------- */
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div
+      className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: Lesson['status'] }) {
+  const map: Record<string, string> = {
+    draft: 'bg-slate-100 text-slate-700',
+    scheduled: 'bg-amber-100 text-amber-800',
+    published: 'bg-emerald-100 text-emerald-800',
+    archived: 'bg-red-100 text-red-700',
+  };
+  const label =
+    status === 'published'
+      ? 'Опубліковано'
+      : status === 'scheduled'
+      ? 'Заплановано'
+      : status === 'archived'
+      ? 'В архіві'
+      : 'Чернетка';
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${map[status]}`}>{label}</span>;
+}
+
+function SkeletonRow() {
+  return (
+    <div className="grid grid-cols-[56px_1fr_120px_100px_150px] gap-4 items-center py-3">
+      <div className="w-14 h-10 bg-slate-200 rounded-md animate-pulse" />
+      <div className="space-y-2">
+        <div className="h-4 w-40 bg-slate-200 rounded animate-pulse" />
+        <div className="h-3 w-56 bg-slate-200 rounded animate-pulse" />
+      </div>
+      <div className="h-6 w-20 bg-slate-200 rounded animate-pulse" />
+      <div className="h-6 w-14 bg-slate-200 rounded animate-pulse" />
+      <div className="h-8 w-28 bg-slate-200 rounded animate-pulse" />
+    </div>
+  );
+}
+
+/* ---------- Page ---------- */
+export default function LessonsPage() {
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ role: string; text: string }[]>([]);
-  const [userInput, setUserInput] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('access') : null;
-  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  // Pagination
+  const pageSize = 8;
+  const [page, setPage] = useState(1);
 
-  // --- Завантаження теорії ---
-  useEffect(() => {
-    if (!id) return;
-
-    axios
-      .get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers })
-      .then((res) => {
-        if (res.data.length > 0) {
-          setContent(res.data[0].theory_text);
-          setTheoryId(res.data[0].id);
-        } else {
-          setContent('<p>Напиши теорію тут...</p>');
-          setTheoryId(null);
-        }
-      })
-      .catch((err: AxiosError) => console.error('❌ Помилка завантаження:', err))
-      .finally(() => setLoading(false));
-  }, [id, token]);
-
-  // --- Збереження теорії ---
-  const handleSave = async (html: string) => {
-    if (!id) return;
-    try {
-      if (theoryId) {
-        const res = await axios.put(
-          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/${theoryId}/`,
-          { theory_text: html },
-          { headers }
-        );
-        setContent(res.data.theory_text);
-      } else {
-        const res = await axios.post(
-          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`,
-          { theory_text: html },
-          { headers }
-        );
-        setTheoryId(res.data.id);
-        setContent(res.data.theory_text);
-      }
-    } catch (error) {
-      const err = error as AxiosError<any>;
-      console.error('❌ Помилка збереження:', err.response?.data || err.message);
-    }
+  const getToken = (): string | null => {
+    return (
+      localStorage.getItem('access') ||
+      localStorage.getItem('accessToken') ||
+      sessionStorage.getItem('access') ||
+      sessionStorage.getItem('accessToken') ||
+      null
+    );
   };
 
-  if (loading) return <p className="text-center mt-10">Завантаження...</p>;
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      setError('Користувач не авторизований');
+      setLoading(false);
+      return;
+    }
+
+    const fetchLessons = async () => {
+      try {
+        const res = await axios.get('https://brainboost.pp.ua/api/api/lesson/admin/lessons/', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setLessons(res.data.results || []);
+      } catch (err: any) {
+        console.error(err);
+        if (err.response?.status === 401) {
+          setError('Неавторизований. Будь ласка, увійдіть у систему.');
+        } else {
+          setError('Помилка завантаження уроків');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLessons();
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(lessons.length / pageSize));
+  const pageItems = useMemo(() => lessons.slice((page - 1) * pageSize, page * pageSize), [lessons, page]);
+
+  /* ---------- Render ---------- */
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top grid place-items-center">
+        <Card className="w-[800px] max-w-[95vw]">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </Card>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="min-h-screen grid place-items-center">
+        <Card className="max-w-xl text-center">
+          <h1 className="text-xl font-bold text-red-600">{error}</h1>
+        </Card>
+      </main>
+    );
+  }
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 bg-white p-6 shadow-md rounded-md relative">
-      <h1 className="text-2xl font-bold mb-4">Редагування теорії</h1>
-      <TheoryEditor initialContent={content} onSave={handleSave} />
-
-      {/* Кнопка чату */}
-      <button
-        onClick={() => setIsChatOpen((prev) => !prev)}
-        className="fixed bottom-6 right-6 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700"
-      >
-        <MessageSquare size={24} />
-      </button>
-
-      {/* Чат */}
-      {isChatOpen && (
-        <div className="fixed bottom-20 right-6 w-80 bg-white shadow-lg rounded-lg border flex flex-col h-96">
-          <div className="p-3 bg-blue-600 text-white font-semibold">💬 Чат з ШІ</div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {chatMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={`p-2 rounded-lg max-w-[80%] ${
-                  msg.role === 'user'
-                    ? 'bg-blue-100 self-end text-right ml-auto'
-                    : 'bg-gray-100 text-left mr-auto'
-                }`}
-              >
-                {msg.text}
-              </div>
-            ))}
-          </div>
-          <div className="p-3 border-t flex gap-2">
-            <input
-              type="text"
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              className="flex-1 border rounded p-2"
-              placeholder="Напиши повідомлення..."
-            />
-            <button
-              onClick={async () => {
-                if (!userInput.trim() || !id) return;
-
-                const userMessage = { role: 'user', text: userInput };
-                setChatMessages((prev) => [...prev, userMessage]);
-                setUserInput('');
-
-                try {
-                  const res = await axios.post(
-                    'https://brainboost.pp.ua/api/api/ai/ask/',
-                    { lesson_id: id, question: userInput },
-                    { headers: { ...headers, 'Content-Type': 'application/json' } }
-                  );
-
-                  const aiMessage = { role: 'assistant', text: res.data.answer };
-                  setChatMessages((prev) => [...prev, aiMessage]);
-                } catch (error) {
-                  const err = error as AxiosError<any>;
-                  const errText = err.response?.data?.error || 'Помилка з боку ШІ.';
-                  setChatMessages((prev) => [...prev, { role: 'assistant', text: `❌ ${errText}` }]);
-                }
-              }}
-              className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700"
-            >
-              ➤
-            </button>
-          </div>
+    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
+      <section className="w-[1280px] max-w-[95vw] mx-auto pt-[100px] pb-16">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="font-bold text-[40px] md:text-[48px] text-[#021C4E]">Список уроків</h1>
+          <Link
+            href="/lessons/create"
+            className="px-4 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold"
+          >
+            + Додати урок
+          </Link>
         </div>
-      )}
-    </div>
+
+        <Card>
+          {/* Table header */}
+          <div className="hidden md:grid grid-cols-[56px_1fr_120px_100px_150px] gap-4 text-xs font-semibold text-slate-600 pb-2 border-b">
+            <div>Обкладинка</div>
+            <div>Урок</div>
+            <div>Статус</div>
+            <div>Тривалість</div>
+            <div>Дії</div>
+          </div>
+
+          {/* Rows */}
+          <div className="divide-y">
+            {pageItems.length === 0 ? (
+              <div className="py-10 text-center text-slate-600">Немає уроків</div>
+            ) : (
+              pageItems.map((lesson) => (
+                <div
+                  key={lesson.id}
+                  className="grid grid-cols-1 md:grid-cols-[56px_1fr_120px_100px_150px] gap-4 items-center py-3"
+                >
+                  <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] bg-slate-100 overflow-hidden">
+                    {lesson.cover_image ? (
+                      <img
+                        src={lesson.cover_image}
+                        alt={lesson.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[#0F2E64] truncate">{lesson.title}</div>
+                    {lesson.summary && (
+                      <div className="text-slate-600 text-sm truncate">
+                        {lesson.summary.length > 100
+                          ? lesson.summary.slice(0, 100) + '…'
+                          : lesson.summary}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <StatusPill status={lesson.status} />
+                  </div>
+
+                  <div className="text-sm text-[#0F2E64]">{lesson.duration_min} хв</div>
+
+                  <div className="flex gap-2 flex-wrap">
+                    <Link
+                      href={`/lessons/${lesson.id}/details`}
+                      className="px-3 py-1.5 rounded-[10px] bg-[#1345DE] text-white text-sm hover:bg-[#0F2E64]"
+                    >
+                      Деталі
+                    </Link>
+                    <Link
+                      href={`/teacher/lessons/${lesson.id}/edit`}
+                      className="px-3 py-1.5 rounded-[10px] bg-[#1345DE] text-white text-sm hover:bg-[#0F2E64]"
+                    >
+                      Редагувати
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white disabled:opacity-50"
+              >
+                ← Назад
+              </button>
+              <div className="px-3 py-2 text-[#0F2E64] font-semibold">
+                {page} / {totalPages}
+              </div>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white disabled:opacity-50"
+              >
+                Далі →
+              </button>
+            </div>
+          )}
+        </Card>
+      </section>
+    </main>
   );
 }

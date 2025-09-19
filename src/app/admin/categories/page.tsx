@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api/';
 const ADMIN_CAT_LIST = `${API_BASE}/courses/admin/categories/`;
 const ADMIN_CAT_DETAIL = (id: number) => `${API_BASE}/courses/admin/categories/${id}/`;
 
@@ -191,22 +191,29 @@ export default function AdminCategoriesPage() {
           </div>
         </div>
 
-        <form onSubmit={onSearch} className="flex items-center gap-2">
+        <form onSubmit={onSearch} className="flex flex-col sm:flex-row items-stretch gap-2 w-full">
           <TextInput
             leftIcon={<Search className="h-5 w-5" />}
             placeholder="Пошук категорій…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            style={{ width: 300 }}
+            className="w-full sm:flex-1 min-w-0" 
           />
-          <Button type="submit" tone="soft"><Search className="h-4 w-4" /> Шукати</Button>
-          <Button type="button" tone="ghost" onClick={() => load(currentUrl)}><RefreshCw className="h-4 w-4" /> Оновити</Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+            <Button type="submit" tone="soft" className="w-full sm:w-auto justify-center">
+              <Search className="h-4 w-4" /> Шукати
+            </Button>
+            <Button type="button" tone="ghost" onClick={() => load(currentUrl)} className="w-full sm:w-auto justify-center">
+              <RefreshCw className="h-4 w-4" /> Оновити
+            </Button>
+          </div>
         </form>
       </div>
     </motion.div>
   );
 
   return (
+    <div className="bg-[url('/images/back.png')] bg-cover bg-center min-h-screen">
     <div className="mx-auto max-w-[1200px] px-5 md:px-8 py-8 space-y-6 text-[15px]">
       {Header}
 
@@ -239,13 +246,13 @@ export default function AdminCategoriesPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed text-[15px]">
+            <table className="w-full min-w-[600px] text-[15px]">
               <thead className="bg-slate-50/80 text-slate-600">
                 <tr>
-                  <th className="py-3 px-5 text-left w-[80px]">ID</th>
-                  <th className="py-3 px-5 text-left">Назва</th>
-                  <th className="py-3 px-5 text-left w-[120px]">Курсів</th>
-                  <th className="py-3 px-5 text-left w-[280px]">Дії</th>
+                  <th className="py-3 px-5 text-left min-w-[80px]">ID</th>
+                  <th className="py-3 px-5 text-left min-w-[150px]">Назва</th>
+                  <th className="py-3 px-5 text-left min-w-[100px]">Курсів</th>
+                  <th className="py-3 px-5 text-left min-w-[120px]">Дії</th>
                 </tr>
               </thead>
               <tbody>
@@ -259,11 +266,11 @@ export default function AdminCategoriesPage() {
                     return (
                       <tr key={c.id} className={`border-t border-slate-100 ${i % 2 ? 'bg-white' : 'bg-slate-50/30'}`}>
                         <td className="py-3 px-5 align-top">{c.id}</td>
-                        <td className="py-3 px-5 align-top">
+                        <td className="py-3 px-5 align-top break-words">
                           {isEditing ? (
                             <TextInput value={edit!.name} onChange={(e) => setEdit({ id: c.id, name: e.target.value })} />
                           ) : (
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-col gap-1">
                               <span className="font-medium text-slate-800">{c.name}</span>
                               {typeof c.courses_count === 'number' && (
                                 <span className="inline-flex items-center gap-1 text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full">
@@ -321,6 +328,7 @@ export default function AdminCategoriesPage() {
           </Card>
         </div>
       )}
+    </div>
     </div>
   );
 }

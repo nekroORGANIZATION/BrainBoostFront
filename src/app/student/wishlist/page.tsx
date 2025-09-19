@@ -3,55 +3,44 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-
-const API_BASE = 'https://brainboost.pp.ua/api/courses';
+import http, { setAuthHeader } from '@/lib/http';
 
 type WishlistItem = {
-  id: number;
+  id: number; // <-- ID елемента вішлиста
   created_at: string;
   course: {
     id: number;
     title: string;
-    image?: string;
-    price?: number;
-    rating?: number;
+    image?: string | null;
+    price?: number | string | null;
+    rating?: number | string | null;
+    slug?: string;
   };
 };
 
-// безопасный парсер ответа
-async function safeJson(res: Response) {
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) {
-    return res.json();
-  }
-  const text = await res.text();
-  throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
-}
-
 export default function WishlistPage() {
-  const { accessToken } = useAuth(); // подгоняй под свой AuthContext
+  const { accessToken } = useAuth();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // підхоплюємо токен у заголовок axios-інстанса
+  useEffect(() => {
+    setAuthHeader(accessToken || null);
+  }, [accessToken]);
 
   const fetchWishlist = useCallback(async () => {
     if (!accessToken) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/wishlist/`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        cache: 'no-store',
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`GET /wishlist failed: ${res.status} ${res.statusText} — ${text.slice(0,150)}`);
-      }
-      const data = await safeJson(res);
+      // важливо: використовуємо http (axios) з інтерцепторами
+      const res = await http.get('/courses/wishlist/');
+      const data = res.data;
       setItems(Array.isArray(data) ? data : data.results || []);
     } catch (e: any) {
       console.error(e);
-      setError(e.message || 'Помилка завантаження');
+      setError(e?.response?.data?.detail || e?.message || 'Помилка завантаження');
     } finally {
       setLoading(false);
     }
@@ -61,18 +50,11 @@ export default function WishlistPage() {
     fetchWishlist();
   }, [fetchWishlist]);
 
-  const removeFromWishlist = async (courseId: number) => {
+  const removeFromWishlist = async (wishlistItemId: number) => {
     if (!accessToken) return;
     try {
-      const res = await fetch(`${API_BASE}/wishlist/${courseId}/`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`DELETE failed: ${res.status} ${text}`);
-      }
-      setItems(prev => prev.filter(x => x.course.id !== courseId));
+      await http.delete(`/courses/wishlist/${wishlistItemId}/`);
+      setItems(prev => prev.filter(x => x.id !== wishlistItemId));
     } catch (e) {
       console.error(e);
       alert('Не вдалося видалити з обраного');
@@ -93,7 +75,7 @@ export default function WishlistPage() {
       <h1 className="text-3xl font-bold mb-4">Моє обране</h1>
 
       {loading && <p>Завантаження...</p>}
-      {error && <p className="text-red-600">{error}</p>}
+      {error && <p className="text-red-600">{String(error)}</p>}
 
       {!loading && !error && (
         items.length === 0 ? (
@@ -104,49 +86,52 @@ export default function WishlistPage() {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {items.map(({ id, course }) => (
-              <div
-                key={id}
-                className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden"
-              >
-                <Link href={`/courses/${course.id}`}>
-                  <div className="aspect-video bg-slate-100 overflow-hidden">
-                    {course.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={course.image}
-                        alt={course.title}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                </Link>
-                <div className="p-4 space-y-2">
-                  <Link
-                    href={`/courses/${course.id}`}
-                    className="block font-semibold text-lg hover:underline"
-                  >
-                    {course.title}
+            {items.map(({ id, course }) => {
+              const courseHref = course.slug ? `/courses/${course.slug}` : `/courses/${course.id}`;
+              return (
+                <div
+                  key={id}
+                  className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden"
+                >
+                  <Link href={courseHref}>
+                    <div className="aspect-video bg-slate-100 overflow-hidden">
+                      {course.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={String(course.image)}
+                          alt={course.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                          No image
+                        </div>
+                      )}
+                    </div>
                   </Link>
-                  <div className="text-sm text-slate-500 flex items-center gap-3">
-                    {course.rating != null && <span>★ {course.rating}</span>}
-                    {course.price != null && <span>{course.price} ₴</span>}
-                  </div>
-                  <div className="pt-2">
-                    <button
-                      onClick={() => removeFromWishlist(course.id)}
-                      className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-300 hover:bg-slate-50"
+                  <div className="p-4 space-y-2">
+                    <Link
+                      href={courseHref}
+                      className="block font-semibold text-lg hover:underline"
                     >
-                      Видалити з обраного
-                    </button>
+                      {course.title}
+                    </Link>
+                    <div className="text-sm text-slate-500 flex items-center gap-3">
+                      {course.rating != null && <span>★ {course.rating}</span>}
+                      {course.price != null && <span>{course.price} ₴</span>}
+                    </div>
+                    <div className="pt-2">
+                      <button
+                        onClick={() => removeFromWishlist(id)} // <-- видаляємо по id елемента
+                        className="px-3 py-2 rounded-xl text-sm font-medium border border-slate-300 hover:bg-slate-50"
+                      >
+                        Видалити з обраного
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       )}

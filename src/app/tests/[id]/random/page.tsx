@@ -68,7 +68,7 @@ export default function TestPage() {
 
     axios
       .post(
-        `https://brainboost.pp.ua/api/api/tests/${test.id}/attempts/start/`,
+        `https://brainboost.pp.ua/api/tests/${test.id}/attempts/start/`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       )

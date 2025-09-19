@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import FooterCard from '@/components/FooterCard';
 
 /* =========================================================
    УТИЛІТИ / КОНСТАНТИ
@@ -110,8 +111,8 @@ function ContactCard({
       <div className="flex items-center gap-3">
         {icon}
         <div>
-          <div className="text-[#0F2E64] font-extrabold">{title}</div>
-          {subtitle ? <div className="text-[#5A78B4] text-sm">{subtitle}</div> : null}
+          <div className="font-extrabold text-[#0F2E64]">{title}</div>
+          {subtitle ? <div className="text-sm text-[#5A78B4]">{subtitle}</div> : null}
         </div>
       </div>
       <div className="flex flex-col">
@@ -145,9 +146,9 @@ function ContactCard({
 function StatCard({ k, v, d }: { k: string; v: string; d: string }) {
   return (
     <div className={CARD_PAD}>
-      <div className="text-[#0F2E64] text-sm">{v}</div>
-      <div className="text-[#1345DE] font-extrabold text-3xl leading-tight">{k}</div>
-      <div className="text-slate-700 mt-1">{d}</div>
+      <div className="text-sm text-[#0F2E64]">{v}</div>
+      <div className="text-3xl font-extrabold leading-tight text-[#1345DE]">{k}</div>
+      <div className="mt-1 text-slate-700">{d}</div>
     </div>
   );
 }
@@ -155,8 +156,8 @@ function StatCard({ k, v, d }: { k: string; v: string; d: string }) {
 function TrustItem({ title, text }: { title: string; text: string }) {
   return (
     <div>
-      <div className="text-[#0F2E64] font-extrabold">{title}</div>
-      <div className="text-slate-700 mt-1">{text}</div>
+      <div className="font-extrabold text-[#0F2E64]">{title}</div>
+      <div className="mt-1 text-slate-700">{text}</div>
     </div>
   );
 }
@@ -251,121 +252,119 @@ export default function ContactsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
+    <main className="min-h-screen bg-[url('/images/back.png')] bg-top bg-cover">
       {/* HERO */}
-      <section className="w-[1280px] mx-auto pt-[159px]">
-        <div
-          className="w-[1047px] mx-auto grid"
-          style={{ gridTemplateColumns: '461px 564px', columnGap: '22px', alignItems: 'start' }}
-        >
-          {/* Ліва колонка — заголовок + підзаголовок + CTA */}
-          <div className="w-[461px]">
-            <h1 className="m-0 w-[423px] font-[Afacad] font-bold text-[96px] leading-[128px] text-[#021C4E]">
-              Контакти
-            </h1>
-
-            <p
-              className="w-[461px] font-[Mulish] font-medium text-[24px] leading-[30px] text-black"
-              style={{ marginTop: `${207 - 81 - 128}px` }}
-            >
-              Ми на зв’язку: обери зручний спосіб і напиши нам — відповімо протягом робочих годин.
-            </p>
-
-            <div className="mt-[22px] flex gap-3">
-              <Link
-                href="#contact-form"
-                className="inline-flex items-center justify-center w-[258px] h-[55px] bg-[#1345DE] text-white rounded-[10px] font-[Mulish] font-semibold text-[14px]"
+      <section className="pt-24 sm:pt-32 lg:pt-40">
+        <div className="mx-auto w-full max-w-[1280px] px-4 sm:px-6">
+          <div className="grid items-start gap-8 lg:grid-cols-2 lg:gap-6">
+            {/* Ліва колонка — заголовок + підзаголовок + CTA */}
+            <div className="max-w-xl lg:max-w-none">
+              <h1
+                className="m-0 font-[Afacad] font-bold leading-[1.05] text-[#021C4E]
+                           text-[clamp(48px,10vw,96px)]"
               >
-                Написати нам
-              </Link>
-              <a
-                href="tel:+380441234567"
-                className="inline-flex items-center gap-2 px-4 h-[55px] rounded-[10px] border border-[#1345DE] text-[#1345DE] font-[Mulish] font-semibold text-[14px]"
-                aria-label="Подзвонити нам"
-              >
-                <PhoneIcon /> +380 (44) 123-45-67
-              </a>
-            </div>
+                Контакти
+              </h1>
 
-            {/* Плашка — години роботи */}
-            <div
-              className="mt-6 flex items-center gap-3 rounded-[14px] bg-white/80 ring-1 ring-[#E5ECFF] p-3 shadow-[0_6px_22px_rgba(2,28,78,0.08)]"
-              aria-label="Графік роботи"
-            >
-              <ClockIcon />
-              <div className="text-[#0F2E64] text-sm">
-                <div className="font-bold">Графік: Пн–Пт, 09:00–18:00</div>
-                <div className="opacity-80">Сб–Нд — відповідаємо у месенджерах</div>
+              <p className="mt-4 max-w-[52ch] font-[Mulish] text-[18px] leading-[1.4] text-black sm:text-[20px] lg:text-[24px]">
+                Ми на зв’язку: обери зручний спосіб і напиши нам — відповімо протягом робочих годин.
+              </p>
+
+              <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row">
+                <Link
+                  href="#contact-form"
+                  className="inline-flex h-[55px] items-center justify-center rounded-[10px] bg-[#1345DE] px-6 font-[Mulish] text-[14px] font-semibold text-white hover:bg-[#0e2db9] transition sm:w-auto"
+                >
+                  Написати нам
+                </Link>
+                <a
+                  href="tel:+380441234567"
+                  className="inline-flex h-[55px] items-center justify-center gap-2 rounded-[10px] border border-[#1345DE] px-4 font-[Mulish] text-[14px] font-semibold text-[#1345DE] sm:w-auto"
+                  aria-label="Подзвонити нам"
+                >
+                  <PhoneIcon /> +380 (44) 123-45-67
+                </a>
+              </div>
+
+              {/* Плашка — години роботи */}
+              <div
+                className="mt-6 flex items-center gap-3 rounded-[14px] bg-white/80 p-3 ring-1 ring-[#E5ECFF] shadow-[0_6px_22px_rgba(2,28,78,0.08)]"
+                aria-label="Графік роботи"
+              >
+                <ClockIcon />
+                <div className="text-sm text-[#0F2E64]">
+                  <div className="font-bold">Графік: Пн–Пт, 09:00–18:00</div>
+                  <div className="opacity-80">Сб–Нд — відповідаємо у месенджерах</div>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Права колонка — картки контактних каналів */}
-          <div
-            className="w-[564px] h-auto grid"
-            style={{
-              gridTemplateColumns: '308px 239px',
-              gridAutoRows: 'auto',
-              columnGap: '17px',
-              rowGap: '19px',
-            }}
-          >
-            <ContactCard
-              title="Email"
-              subtitle="Відповідь до 1 роб. дня"
-              icon={<MailIcon />}
-              items={[
-                { label: 'Підтримка', href: 'mailto:support@brainboost.ua' },
-                { label: 'Партнерства', href: 'mailto:partners@brainboost.ua' },
-              ]}
-            />
-            <ContactCard
-              title="Месенджери"
-              subtitle="Швидкий зв’язок"
-              icon={<TelegramIcon />}
-              items={[
-                { label: 'Telegram', href: 'https://t.me/brainboost' },
-                { label: 'WhatsApp', href: 'https://wa.me/380441234567', icon: <WhatsAppIcon /> },
-              ]}
-            />
-            <ContactCard
-              title="Телефон"
-              subtitle="Пн–Пт, 09:00–18:00"
-              icon={<PhoneIcon />}
-              items={[
-                { label: '+380 (44) 123-45-67', href: 'tel:+380441234567' },
-                { label: '+380 (67) 987-65-43', href: 'tel:+380679876543' },
-              ]}
-            />
-            <ContactCard
-              title="Офіс"
-              subtitle="Київ, Балтійська, 23А"
-              icon={<MapPinIcon />}
-              items={[{ label: 'Побудувати маршрут', href: '#map' }]}
-            />
+            {/* Права колонка — картки контактних каналів */}
+            <div className="mx-auto w-full max-w-[564px]">
+              <div
+                className="grid gap-4"
+                style={{
+                  gridTemplateColumns: '1fr 0.78fr', // 308/239≈0.78 — зберігає пропорції
+                }}
+              >
+                <ContactCard
+                  title="Email"
+                  subtitle="Відповідь до 1 роб. дня"
+                  icon={<MailIcon />}
+                  items={[
+                    { label: 'Підтримка', href: 'mailto:support@brainboost.ua' },
+                    { label: 'Партнерства', href: 'mailto:partners@brainboost.ua' },
+                  ]}
+                />
+                <ContactCard
+                  title="Месенджери"
+                  subtitle="Швидкий зв’язок"
+                  icon={<TelegramIcon />}
+                  items={[
+                    { label: 'Telegram', href: 'https://t.me/brainboost' },
+                    { label: 'WhatsApp', href: 'https://wa.me/380441234567', icon: <WhatsAppIcon /> },
+                  ]}
+                />
+                <ContactCard
+                  title="Телефон"
+                  subtitle="Пн–Пт, 09:00–18:00"
+                  icon={<PhoneIcon />}
+                  items={[
+                    { label: '+380 (44) 123-45-67', href: 'tel:+380441234567' },
+                    { label: '+380 (67) 987-65-43', href: 'tel:+380679876543' },
+                  ]}
+                />
+                <ContactCard
+                  title="Офіс"
+                  subtitle="Київ, Балтійська, 23А"
+                  icon={<MapPinIcon />}
+                  items={[{ label: 'Побудувати маршрут', href: '#map' }]}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Швидкі контакти */}
       <section className="mt-12">
-        <div className="mx-auto max-w-[1200px] px-6 md:px-[118px] grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard k="24/7" v="чат-бот" d="Базові питання вирішуємо миттєво" />
-          <StatCard k="~15 хв" v="середній SLA" d="В робочий час відповідаємо дуже швидко" />
-          <StatCard k="98%" v="задоволених" d="За результатами опитувань студентів" />
+        <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-3 lg:px-[118px]">
+          <StatCard k="24/7" v="чат-бот" d="Базові питання вирішуємо миттєво*" />
+          <StatCard k="~15 хв" v="середній SLA" d="В робочий час відповідаємо дуже швидко*" />
+          <StatCard k="98%" v="задоволених" d="За результатами опитувань студентів*" />
         </div>
       </section>
 
       {/* Форма */}
       <section id="contact-form" className="py-12">
-        <div className="mx-auto max-w-[1160px] px-6 md:px-[118px]">
-          <div className="rounded-[24px] bg-white ring-1 ring-[#E5ECFF] shadow-[0_10px_30px_rgba(2,28,78,0.08)] p-6 md:p-8">
-            <h2 className="text-[#0F2E64] font-extrabold text-[28px] md:text-[32px]">Напишіть нам</h2>
-            <p className="text-slate-700 mt-1">Заповніть форму — ми відповімо протягом робочого дня.</p>
+        <div className="mx-auto w-full max-w-[1160px] px-4 sm:px-6 lg:px-[118px]">
+          <div className="rounded-[24px] bg-white p-6 ring-1 ring-[#E5ECFF] shadow-[0_10px_30px_rgba(2,28,78,0.08)] sm:p-8">
+            <h2 className="text-[28px] font-extrabold text-[#0F2E64] md:text-[32px]">Напишіть нам</h2>
+            <p className="mt-1 text-slate-700">Заповніть форму — ми відповімо протягом робочого дня.</p>
 
             {status && (
               <div
-                className={`mt-4 p-3 rounded ${
+                className={`mt-4 rounded p-3 ${
                   status.type === 'success'
                     ? 'bg-green-100 text-green-800'
                     : 'bg-red-100 text-red-800'
@@ -379,7 +378,7 @@ export default function ContactsPage() {
 
             <form
               onSubmit={handleSubmit}
-              className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5"
+              className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2"
               noValidate
             >
               <Field label="Ім’я">
@@ -389,7 +388,7 @@ export default function ContactsPage() {
                   onChange={handleChange}
                   required
                   placeholder="Ваше ім’я"
-                  className="w-full rounded-[12px] ring-1 ring-[#E5ECFF] p-3 outline-none focus:ring-[#1345DE]"
+                  className="w-full rounded-[12px] p-3 outline-none ring-1 ring-[#E5ECFF] focus:ring-[#1345DE]"
                 />
               </Field>
               <Field label="Email" hint="На цю адресу ми надішлемо відповідь">
@@ -400,7 +399,7 @@ export default function ContactsPage() {
                   onChange={handleChange}
                   required
                   placeholder="you@mail.com"
-                  className="w-full rounded-[12px] ring-1 ring-[#E5ECFF] p-3 outline-none focus:ring-[#1345DE]"
+                  className="w-full rounded-[12px] p-3 outline-none ring-1 ring-[#E5ECFF] focus:ring-[#1345DE]"
                 />
               </Field>
               <Field label="Тема звернення">
@@ -408,7 +407,7 @@ export default function ContactsPage() {
                   name="topic"
                   value={formData.topic}
                   onChange={handleChange}
-                  className="w-full rounded-[12px] ring-1 ring-[#E5ECFF] p-3 outline-none focus:ring-[#1345DE]"
+                  className="w-full rounded-[12px] p-3 outline-none ring-1 ring-[#E5ECFF] focus:ring-[#1345DE]"
                 >
                   <option>Питання щодо курсів</option>
                   <option>Оплата та рахунки</option>
@@ -424,7 +423,7 @@ export default function ContactsPage() {
                   onChange={handleChange}
                   type="tel"
                   placeholder="+380…"
-                  className="w-full rounded-[12px] ring-1 ring-[#E5ECFF] p-3 outline-none focus:ring-[#1345DE]"
+                  className="w-full rounded-[12px] p-3 outline-none ring-1 ring-[#E5ECFF] focus:ring-[#1345DE]"
                 />
               </Field>
               <div className="md:col-span-2">
@@ -436,11 +435,11 @@ export default function ContactsPage() {
                     required
                     rows={5}
                     placeholder="Коротко опишіть питання"
-                    className="w-full rounded-[12px] ring-1 ring-[#E5ECFF] p-3 outline-none focus:ring-[#1345DE]"
+                    className="w-full rounded-[12px] p-3 outline-none ring-1 ring-[#E5ECFF] focus:ring-[#1345DE]"
                   />
                 </Field>
               </div>
-              <div className="md:col-span-2 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-4 md:col-span-2">
                 <label className="inline-flex items-center gap-2 text-sm text-slate-600">
                   <input
                     name="agree"
@@ -454,7 +453,7 @@ export default function ContactsPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="inline-flex items-center justify-center rounded-[12px] bg-[#1345DE] px-6 py-3 text-white font-semibold hover:bg-[#0e2db9] transition"
+                  className="inline-flex items-center justify-center rounded-[12px] bg-[#1345DE] px-6 py-3 font-semibold text-white transition hover:bg-[#0e2db9]"
                 >
                   {loading ? 'Надсилаю…' : 'Надіслати'}
                 </button>
@@ -466,17 +465,17 @@ export default function ContactsPage() {
 
       {/* Офіс / Карта */}
       <section id="map" className="pb-12">
-        <div className="mx-auto max-w-[1160px] px-6 md:px-[118px] grid grid-cols-1 lg:grid-cols-[380px_minmax(0,1fr)] gap-6">
+        <div className="mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-6 px-4 sm:px-6 lg:grid-cols-[380px_minmax(0,1fr)] lg:px-[118px]">
           <div className={CARD_PAD}>
-            <h3 className="text-[#0F2E64] font-extrabold text-[22px]">Наш офіс</h3>
+            <h3 className="text-[22px] font-extrabold text-[#0F2E64]">Наш офіс</h3>
             <p className="mt-2 text-slate-700">Київ, вулиця Балтійська, 23А</p>
-            <div className="mt-3 text-sm text-slate-600 space-y-1">
+            <div className="mt-3 space-y-1 text-sm text-slate-600">
               <div>Пн–Пт: 09:00–18:00</div>
               <div>Сб–Нд: вихідні</div>
             </div>
             <div className="mt-4 flex flex-col gap-2">
               <a
-                className="text-[#1345DE] font-semibold hover:underline"
+                className="font-semibold text-[#1345DE] hover:underline"
                 href="https://maps.google.com/?q=Київ,Балтійська,23А"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -493,11 +492,11 @@ export default function ContactsPage() {
               </a>
             </div>
           </div>
-          <div className="rounded-[20px] overflow-hidden ring-1 ring-[#E5ECFF] shadow-[0_8px_24px_rgba(2,28,78,0.06)] bg-white">
+          <div className="overflow-hidden rounded-[20px] bg-white ring-1 ring-[#E5ECFF] shadow-[0_8px_24px_rgba(2,28,78,0.06)]">
             <iframe
               title="Карта офісу Brainboost"
               src={`https://www.google.com/maps?q=${encodeURIComponent('Київ, Балтійська 23А')}&output=embed`}
-              className="w-full min-h-[300px] md:h-full"
+              className="h-[320px] w-full md:h-[420px] lg:h-full"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
@@ -508,19 +507,19 @@ export default function ContactsPage() {
 
       {/* FAQ */}
       <section className="pb-14">
-        <div className="mx-auto max-w-[1160px] px-6 md:px-[118px]">
-          <h3 className="text-[#0F2E64] font-extrabold text-[28px] md:text-[32px]">Поширені питання</h3>
+        <div className="mx-auto w-full max-w-[1160px] px-4 sm:px-6 lg:px-[118px]">
+          <h3 className="text-[28px] font-extrabold text-[#0F2E64] md:text-[32px]">Поширені питання</h3>
           <div className="mt-6 space-y-3">
             {faqData.map((f, i) => (
-              <div key={i} className="rounded-[16px] bg-white ring-1 ring-[#E5ECFF] overflow-hidden">
+              <div key={i} className="overflow-hidden rounded-[16px] bg-white ring-1 ring-[#E5ECFF]">
                 <button
-                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
                   aria-expanded={openFaq === i}
                   aria-controls={`faq-panel-${i}`}
                 >
                   <span className="font-semibold text-[#0F2E64]">{f.q}</span>
-                  <span className="text-[#1345DE] font-bold">{openFaq === i ? '−' : '+'}</span>
+                  <span className="font-bold text-[#1345DE]">{openFaq === i ? '−' : '+'}</span>
                 </button>
                 <div
                   id={`faq-panel-${i}`}
@@ -536,17 +535,17 @@ export default function ContactsPage() {
 
       {/* CTA месенджери */}
       <section className="pb-16">
-        <div className="mx-auto max-w-[1160px] px-6 md:px-[118px] grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mx-auto grid w-full max-w-[1160px] grid-cols-1 gap-6 px-4 sm:px-6 md:grid-cols-2 lg:px-[118px]">
           <a
             href="https://t.me/brainboost"
             target="_blank"
             rel="noopener noreferrer"
-            className={`${CARD_PAD} flex items-center gap-4 hover:ring-[#1345DE] transition`}
+            className={`${CARD_PAD} flex items-center gap-4 transition hover:ring-[#1345DE]`}
           >
             <TelegramIcon />
             <div>
-              <div className="text-[#0F2E64] font-extrabold">Telegram</div>
-              <div className="text-slate-700 text-sm">
+              <div className="font-extrabold text-[#0F2E64]">Telegram</div>
+              <div className="text-sm text-slate-700">
                 Швидкі відповіді менеджера, статус замовлення, консультації
               </div>
             </div>
@@ -555,12 +554,12 @@ export default function ContactsPage() {
             href="https://wa.me/380441234567"
             target="_blank"
             rel="noopener noreferrer"
-            className={`${CARD_PAD} flex items-center gap-4 hover:ring-[#1345DE] transition`}
+            className={`${CARD_PAD} flex items-center gap-4 transition hover:ring-[#1345DE]`}
           >
             <WhatsAppIcon />
             <div>
-              <div className="text-[#0F2E64] font-extrabold">WhatsApp</div>
-              <div className="text-slate-700 text-sm">
+              <div className="font-extrabold text-[#0F2E64]">WhatsApp</div>
+              <div className="text-sm text-slate-700">
                 Питання щодо курсів та оплат, швидка допомога
               </div>
             </div>
@@ -570,14 +569,15 @@ export default function ContactsPage() {
 
       {/* Довіра */}
       <section className="pb-20">
-        <div className="mx-auto max-w-[1160px] px-6 md:px-[118px]">
-          <div className="rounded-[24px] bg-white ring-1 ring-[#E5ECFF] p-6 md:p-8 shadow-[0_10px_30px_rgba(2,28,78,0.08)] grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mx-auto w-full max-w-[1160px] px-4 sm:px-6 lg:px-[118px]">
+          <div className="grid grid-cols-1 gap-6 rounded-[24px] bg-white p-6 ring-1 ring-[#E5ECFF] shadow-[0_10px_30px_rgba(2,28,78,0.08)] sm:p-8 md:grid-cols-3">
             <TrustItem title="Офіційний договір" text="Робимо та надсилаємо документи на запит" />
             <TrustItem title="Захист персональних даних" text="Дотримуємось GDPR та локального законодавства" />
             <TrustItem title="Безпечна оплата" text="Платежі через захищені платіжні шлюзи" />
           </div>
         </div>
       </section>
+      <FooterCard/>
     </main>
   );
 }

@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import http, { API_BASE } from '@/lib/http';
+import { CheckCircle2, XCircle, RotateCw, Trash2, ExternalLink, ChevronDown } from "lucide-react";
+
 
 /* =========================
    Конфіг
@@ -366,7 +368,7 @@ export default function AdminReviewsPage() {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-3 gap-3 min-w-[360px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full">
               <KPI title={String(items.length)} sub="усього" />
               <KPI title={String(items.filter((i) => i.status === 'pending').length)} sub="на модерації" />
               <KPI title={String(items.filter((i) => i.status === 'approved').length)} sub="схвалено" />
@@ -378,7 +380,7 @@ export default function AdminReviewsPage() {
       {/* Липка панель фільтрів + дій */}
       <div ref={stickyRef} className="h-0" />
       <section className={cx(stuck && 'sticky top-0 z-40 shadow-[0_8px_24px_rgba(2,28,78,0.08)]')}>
-        <div className={cx(CONTAINER, 'bg-white/90 backdrop-blur')}>
+        <div className={cx(CONTAINER, 'bg-white/90 backdrop-blur rounded-[15px] shadow-md p-4')}>
           <div className="grid grid-cols-12 gap-3 py-4">
             <div className="col-span-12 lg:col-span-5">
               <input
@@ -525,27 +527,6 @@ export default function AdminReviewsPage() {
         </div>
       </section>
 
-      {/* Теги-швидкі фільтри (демо) */}
-      <section className="py-3">
-        <div className={CONTAINER}>
-          <div className="flex flex-wrap gap-2">
-            {['Менторство', 'Працевлаштування', 'Pet-проєкт', 'Онлайн', 'UI/UX', 'Figma'].map((t) => (
-              <Pill
-                key={t}
-                active={q.toLowerCase().includes(t.toLowerCase())}
-                onClick={() => {
-                  const exists = q.toLowerCase().includes(t.toLowerCase());
-                  setQ((v) => (exists ? v.replace(new RegExp(`\\b${t}\\b`, 'i'), '').trim() : `${v} ${t}`.trim()));
-                  setPage(1);
-                }}
-              >
-                #{t}
-              </Pill>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Контент */}
       <section className="py-6">
         <div className={cx(CONTAINER, 'grid grid-cols-1 lg:grid-cols-2 gap-5')}>
@@ -669,10 +650,6 @@ export default function AdminReviewsPage() {
     </main>
   );
 }
-
-/* =========================
-   Картка
-========================= */
 function AdminCard({
   it,
   courseTitle,
@@ -681,7 +658,7 @@ function AdminCard({
   onApprove,
   onReject,
   onReturn,
-  onDelete,
+  onDelete, // залишив у сигнатурі
 }: {
   it: ReviewAdmin;
   courseTitle?: string;
@@ -694,108 +671,235 @@ function AdminCard({
 }) {
   const [open, setOpen] = useState(false);
   const avatar = mediaUrl(it.user_avatar);
+  const longText = (it.text?.length || 0) > 220;
+
+  const tone = it.status === 'approved' ? 'green' : it.status === 'rejected' ? 'red' : 'yellow';
+  const topBar =
+    tone === 'green'
+      ? 'from-green-500/85 to-green-400/45'
+      : tone === 'red'
+      ? 'from-red-500/85 to-red-400/45'
+      : 'from-yellow-500/85 to-yellow-400/45';
+  const dot = tone === 'green' ? 'bg-green-500' : tone === 'red' ? 'bg-red-500' : 'bg-yellow-500';
 
   return (
-    <article className="rounded-[16px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] hover:shadow-[0_10px_28px_rgba(2,28,78,0.08)] transition-shadow">
-      <header className="flex items-start gap-4">
-        <input type="checkbox" checked={checked} onChange={onCheck} className="mt-1 accent-[#1345DE]" />
-        <div className="relative shrink-0">
-          <img src={avatar || '/images/avatar1.png'} alt={it.user_name} className="w-12 h-12 rounded-full object-cover ring-2 ring-white" />
-          <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-[#46D783] ring-2 ring-white" />
-        </div>
+    /* ЗОВНІШНІЙ GLOW: SVG (не залежить від Tailwind арбітрарних класів) */
+    <div className="relative z-0">
+      <svg
+        aria-hidden
+        className="pointer-events-none absolute -z-10 -inset-10"
+        width="0"
+        height="0"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        style={{ filter: 'blur(28px)' }}
+      >
+        <defs>
+          <radialGradient id="glowA" cx="50%" cy="-10%" r="110%">
+            <stop offset="0%" stopColor="rgba(56,189,248,0.35)" />
+            <stop offset="70%" stopColor="rgba(56,189,248,0)" />
+          </radialGradient>
+          <radialGradient id="glowB" cx="100%" cy="120%" r="90%">
+            <stop offset="0%" stopColor="rgba(99,102,241,0.25)" />
+            <stop offset="70%" stopColor="rgba(99,102,241,0)" />
+          </radialGradient>
+        </defs>
+        <rect x="0" y="0" width="100%" height="100%" fill="url(#glowA)" />
+        <rect x="0" y="0" width="100%" height="100%" fill="url(#glowB)" />
+      </svg>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[#0F2E64] font-extrabold">{it.user_name || 'Користувач'}</div>
-            <Badge>{courseTitle || `Курс #${it.course}`}</Badge>
-            <StatusBadge s={it.status} />
-            <div className="ml-auto flex items-center gap-2 text-sm text-slate-600">
-              <Stars value={it.rating} />
-              <span>{new Date(it.created_at).toLocaleDateString()}</span>
-            </div>
+      {/* КАРТКА з ВНУТРІШНІМ ГРАДІЄНТОМ (видно навіть якщо overflow:hidden на батькові) */}
+      <article
+        className="relative overflow-hidden rounded-3xl ring-1 ring-[#E5ECFF]
+                   shadow-[0_24px_70px_rgba(2,28,78,0.14)] hover:shadow-[0_30px_96px_rgba(2,28,78,0.18)]
+                   transition-all"
+      >
+        {/* внутрішній градієнт — окремий SVG під контентом */}
+        <svg
+          aria-hidden
+          className="absolute inset-0 -z-10"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <linearGradient id="cardBase" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#f8fafc" />
+            </linearGradient>
+            <radialGradient id="tintL" cx="0%" cy="0%" r="75%">
+              <stop offset="0%" stopColor="rgba(99,102,241,0.10)" />
+              <stop offset="60%" stopColor="rgba(99,102,241,0)" />
+            </radialGradient>
+            <radialGradient id="tintR" cx="100%" cy="120%" r="80%">
+              <stop offset="0%" stopColor="rgba(16,185,129,0.10)" />
+              <stop offset="60%" stopColor="rgba(16,185,129,0)" />
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#cardBase)" />
+          <rect width="100%" height="100%" fill="url(#tintL)" />
+          <rect width="100%" height="100%" fill="url(#tintR)" />
+        </svg>
+
+        {/* верхня смуга-акцент */}
+        <div className={`h-1.5 w-full bg-gradient-to-r ${topBar}`} />
+
+        <header className="flex items-start gap-4 p-5">
+          <input type="checkbox" checked={checked} onChange={onCheck} className="mt-1 accent-[#1345DE]" />
+
+          {/* аватар + статус */}
+          <div className="relative shrink-0">
+            <img
+              src={avatar || '/images/avatar1.png'}
+              alt={it.user_name}
+              className="w-12 h-12 rounded-full object-cover ring-2 ring-white"
+            />
+            <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${dot}`} />
           </div>
 
-          <p className={cx('mt-3 text-slate-800 whitespace-pre-line leading-[1.55]', !open && 'line-clamp-4')}>{it.text}</p>
-          {it.text.length > 220 && (
-            <button onClick={() => setOpen((o) => !o)} className="mt-1 text-[#1345DE] font-semibold">
-              {open ? 'Згорнути' : 'Показати більше'}
-            </button>
-          )}
-
-          {(it.images?.length || it.video_url) && (
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {mapImages(it.images).map((img) => (
-                <a
-                  key={img.id}
-                  href={img.image}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group rounded-[12px] overflow-hidden ring-1 ring-[#E5ECFF]"
-                >
-                  <img
-                    src={img.image}
-                    className="w-full aspect-[4/3] object-cover transition-transform group-hover:scale-[1.02]"
-                    alt=""
-                    loading="lazy"
-                  />
-                </a>
-              ))}
-              {it.video_url && (
-                <div className="col-span-2 rounded-[12px] overflow-hidden ring-1 ring-[#E5ECFF]">
-                  <div className="relative w-full aspect-[16/9]">
-                    <iframe
-                      className="absolute inset-0 w-full h-full"
-                      src={ytEmbed(it.video_url)}
-                      title="Video"
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
+          {/* контент */}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="truncate max-w-[56%] text-slate-900 font-extrabold">
+                {it.user_name || 'Користувач'}
+              </div>
+              <Badge>{courseTitle || `Курс #${it.course}`}</Badge>
+              <StatusBadge s={it.status} />
+              <div className="ml-auto flex items-center gap-3 text-sm text-slate-600">
+                <div className="inline-flex items-center gap-1">
+                  <Stars value={it.rating} />
+                  <span className="font-semibold">{Number(it.rating).toFixed(1)}</span>
                 </div>
-              )}
-            </div>
-          )}
-
-          {it.moderation_reason ? (
-            <div className="mt-4 rounded-[12px] bg-yellow-50 ring-1 ring-yellow-200 p-3 text-sm text-yellow-900">
-              <span className="font-semibold">Причина:</span> {it.moderation_reason}
-            </div>
-          ) : null}
-
-          <div className="mt-5 pt-4 border-t border-[#EEF3FF] flex flex-wrap items-center gap-8">
-            <div className="flex gap-2">
-              {it.status !== 'approved' && (
-                <button onClick={onApprove} className="h-10 px-4 rounded-[10px] bg-green-600 text-white">
-                  Схвалити
-                </button>
-              )}
-              {it.status !== 'rejected' && (
-                <button onClick={onReject} className="h-10 px-4 rounded-[10px] bg-yellow-600 text-white">
-                  Відхилити
-                </button>
-              )}
-              {it.status !== 'pending' && (
-                <button onClick={onReturn} className="h-10 px-4 rounded-[10px] bg-white ring-1 ring-[#E5ECFF]">
-                  Повернути на модерацію
-                </button>
-              )}
+                <span className="hidden md:inline">•</span>
+                <span>{new Date(it.created_at).toLocaleDateString()}</span>
+              </div>
             </div>
 
-            <div className="ml-auto flex gap-2">
-              <button onClick={onDelete} className="h-10 px-4 rounded-[10px] bg-red-600 text-white">
-                Видалити
-              </button>
-              <Link
-                href={`/admin/reviews/${it.id}`}
-                className="h-10 inline-grid place-items-center px-4 rounded-[10px] text-[#1345DE] ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE]"
-              >
-                Деталі →
-              </Link>
+            {/* текст + фейд */}
+            <div className="relative mt-3">
+              <p className={cx('text-slate-800 whitespace-pre-line leading-relaxed', !open && 'line-clamp-4')}>
+                {it.text}
+              </p>
+              {!open && longText && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent"
+                />
+              )}
+              {longText && (
+                <button
+                  onClick={() => setOpen(o => !o)}
+                  className="mt-2 inline-flex items-center gap-1 text-[#1345DE] font-semibold
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1345DE]/50 rounded-md"
+                >
+                  {open ? 'Згорнути' : 'Показати повністю'}
+                  <svg className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none">
+                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* медіа */}
+            {(it.images?.length || it.video_url) && (
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {mapImages(it.images).map(img => (
+                  <a
+                    key={img.id}
+                    href={img.image}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative rounded-2xl overflow-hidden ring-1 ring-[#E5ECFF]"
+                  >
+                    <img
+                      src={img.image}
+                      className="w-full aspect-[4/3] object-cover transition-transform group-hover:scale-[1.03]"
+                      alt=""
+                      loading="lazy"
+                    />
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[11px] ring-1 ring-[#E5ECFF]">
+                      Переглянути
+                    </span>
+                  </a>
+                ))}
+                {it.video_url && (
+                  <div className="col-span-2 rounded-2xl overflow-hidden ring-1 ring-[#E5ECFF]">
+                    <div className="relative w-full aspect-[16/9]">
+                      <iframe
+                        className="absolute inset-0 w-full h-full"
+                        src={ytEmbed(it.video_url)}
+                        title="Video"
+                        loading="lazy"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* розділювач */}
+            <div className="mt-5 h-px w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
+
+            {/* кнопки — в один ряд, рівні */}
+            <div className="mt-3">
+              <div className="flex flex-nowrap items-center gap-2 rounded-2xl bg-white/90 backdrop-blur ring-1 ring-[#E5ECFF] px-2.5 py-2 shadow-[0_12px_28px_rgba(2,28,78,0.08)]">
+                {it.status !== 'approved' && (
+                  <button
+                    onClick={onApprove}
+                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                               bg-gradient-to-b from-emerald-500 to-emerald-600 text-white
+                               shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(16,185,129,0.35)]
+                               hover:brightness-105 active:translate-y-[1px]
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    title="Схвалити"
+                  >
+                    ✓ <span>Схвалити</span>
+                  </button>
+                )}
+                {it.status !== 'rejected' && (
+                  <button
+                    onClick={onReject}
+                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                               bg-gradient-to-b from-amber-500 to-amber-600 text-white
+                               shadow-[inset_0_1px_0_rgба(255,255,255,0.35),0_10px_24px_rgба(234,179,8,0.35)]
+                               hover:brightness-105 active:translate-y-[1px]
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                    title="Відхилити"
+                  >
+                    ✕ <span>Відхилити</span>
+                  </button>
+                )}
+                {it.status !== 'pending' && (
+                  <button
+                    onClick={onReturn}
+                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                               bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50
+                               shadow-[inset_0_1px_0_rgба(255,255,255,0.6),0_8px_18px_rgба(2,28,78,0.06)]
+                               active:translate-y-[1px]
+                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                    title="Повернути на модерацію"
+                  >
+                    ⟲ <span>Повернути</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+        </header>
+
+        {/* стрічка статусу */}
+        <div className="pointer-events-none absolute -right-10 top-5 rotate-45">
+          <div
+            className={cx(
+              'px-10 py-1 text-xs font-bold text-white shadow',
+              tone === 'green' ? 'bg-green-600' : tone === 'red' ? 'bg-red-600' : 'bg-yellow-600'
+            )}
+          >
+            {it.status === 'approved' ? 'Схвалено' : it.status === 'rejected' ? 'Відхилено' : 'На модерації'}
+          </div>
         </div>
-      </header>
-    </article>
+      </article>
+    </div>
   );
 }

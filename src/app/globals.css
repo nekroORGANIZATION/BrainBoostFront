@@ -85,4 +85,25 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+/* вже є, але хай буде явно */
+html, body { margin: 0; padding: 0; width: 100%; max-width: 100%; overflow-x: hidden; }
 
+/* Ховаємо горизонтальний скролбар у центр-меню */
+.no-scrollbar {
+  -ms-overflow-style: none;       /* IE/Edge */
+  scrollbar-width: none;          /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+
+/* захист для fixed-елемента */
+.site-header {
+  backface-visibility: hidden;
+  transform: translateZ(0);  /* вже дублюємо inline — це ок */
+  contain: layout paint style; /* ізолює перерахунки */
+  will-change: transform;
+  z-index: 10000;
+}
+
+/* коли відкрито бургер — просто клас на <html>, але ми і так задаємо через var */
+html.has-mobile-panel .header-spacer { /* опціонально, якщо захочеш класом керувати */ }

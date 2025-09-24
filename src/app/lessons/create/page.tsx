@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Link from 'next/link';
@@ -15,112 +15,48 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   );
 }
 
-type Course = { id: number; title: string };
-
 export default function LessonCreatePage() {
   const router = useRouter();
+  const token = localStorage.getItem('accessToken');
 
-  // === SSR-safe: читаем токен только на клиенте ===
-  const [token, setToken] = useState<string | null>(null);
-  useEffect(() => {
-    try {
-      const t = typeof window !== 'undefined' ? window.localStorage.getItem('accessToken') : null;
-      setToken(t);
-    } catch {
-      setToken(null);
-    }
-  }, []);
-
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<{ id: number; title: string }[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
-
   const [lesson, setLesson] = useState({
     title: '',
     summary: '',
     status: 'draft',
     duration_min: '',
     order: '',
-    type: 'TEXT' as 'TEXT' | 'VIDEO' | 'LINK',
+    type: 'TEXT',
     content_text: '',
     content_url: '',
     cover_image: null as File | null,
     course: '',
   });
-
   const [message, setMessage] = useState<string | null>(null);
 
-  // === Превью обложки без обращений к URL на сервере ===
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   useEffect(() => {
-    if (!lesson.cover_image) {
-      setCoverPreview(null);
-      return;
-    }
-    // создаём objectURL только в браузере
-    if (typeof window !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-      const url = URL.createObjectURL(lesson.cover_image);
-      setCoverPreview(url);
-      return () => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch {}
-      };
-    } else {
-      setCoverPreview(null);
-    }
-  }, [lesson.cover_image]);
+    if (!token) return;
 
-  // === Загрузка курсов после того, как токен стал известен ===
-  useEffect(() => {
-    if (!token) {
-      setLoadingCourses(false);
-      return;
-    }
-    let ignore = false;
-    (async () => {
-      try {
-        const res = await axios.get(`${API_BASE}courses/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!ignore) {
-          // бэкенд, вероятно, отдаёт { results: [...] }
-          const list: Course[] = Array.isArray(res.data?.results) ? res.data.results : res.data;
-          setCourses(list || []);
-        }
-      } catch {
-        // проглатываем, просто не показываем курсы
-      } finally {
-        if (!ignore) setLoadingCourses(false);
-      }
-    })();
-    return () => {
-      ignore = true;
-    };
+    axios
+      .get(`${API_BASE}/courses/`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => { setCourses(res.data.results); setLoadingCourses(false); })
+      .catch(() => setLoadingCourses(false));
   }, [token]);
 
-  const handleFieldChange = (field: keyof typeof lesson, value: any) =>
+  const handleFieldChange = (field: string, value: any) =>
     setLesson(prev => ({ ...prev, [field]: value }));
 
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      setLesson(prev => ({ ...prev, cover_image: e.target.files![0] }));
-    }
+    if (e.target.files?.[0]) setLesson(prev => ({ ...prev, cover_image: e.target.files![0] }));
   };
 
   const removeCover = () => setLesson(prev => ({ ...prev, cover_image: null }));
 
   const handleSubmit = async () => {
-    if (!token) {
-      setMessage('Треба увійти в систему');
-      setTimeout(() => setMessage(null), 5000);
-      return;
-    }
+    if (!token) return setMessage('Треба увійти в систему');
 
-    if (!lesson.title || !lesson.type || !lesson.course) {
-      setMessage('Заповніть назву, тип та курс');
-      setTimeout(() => setMessage(null), 5000);
-      return;
-    }
+    if (!lesson.title || !lesson.type || !lesson.course) return setMessage('Заповніть назву, тип та курс');
 
     const formData = new FormData();
     formData.append('course', lesson.course);
@@ -131,36 +67,18 @@ export default function LessonCreatePage() {
     formData.append('order', lesson.order);
     formData.append('type', lesson.type);
 
-    if (lesson.type === 'TEXT' && lesson.content_text) {
-      formData.append('content_text', lesson.content_text);
-    }
-    if ((lesson.type === 'VIDEO' || lesson.type === 'LINK') && lesson.content_url) {
+    if (lesson.type === 'TEXT' && lesson.content_text) formData.append('content_text', lesson.content_text);
+    if ((lesson.type === 'VIDEO' || lesson.type === 'LINK') && lesson.content_url)
       formData.append('content_url', lesson.content_url);
-    }
-    if (lesson.cover_image) {
-      formData.append('cover_image', lesson.cover_image);
-    }
+
+    if (lesson.cover_image) formData.append('cover_image', lesson.cover_image);
 
     try {
-      // оставляю исходный путь, чтобы не ломать API (заметь, без двойного "//")
-      const res = await axios.post(`${API_BASE}api/lesson/lessons/`, formData, {
+      const res = await axios.post(`${API_BASE}/api/lesson/lessons/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
       });
       setMessage('🎉 Урок створено!');
-      setLesson({
-        title: '',
-        summary: '',
-        status: 'draft',
-        duration_min: '',
-        order: '',
-        type: 'TEXT',
-        content_text: '',
-        content_url: '',
-        cover_image: null,
-        course: '',
-      });
-      // при желании можно редиректить:
-      // router.push('/teacher/lessons');
+      setLesson({ title: '', summary: '', status: 'draft', duration_min: '', order: '', type: 'TEXT', content_text: '', content_url: '', cover_image: null, course: '' });
     } catch {
       setMessage('❌ Помилка при створенні уроку');
     }
@@ -190,9 +108,7 @@ export default function LessonCreatePage() {
               >
                 <option value="">-- Оберіть курс --</option>
                 {courses.map(c => (
-                  <option key={c.id} value={String(c.id)}>
-                    {c.title}
-                  </option>
+                  <option key={c.id} value={c.id}>{c.title}</option>
                 ))}
               </select>
             )}
@@ -225,7 +141,7 @@ export default function LessonCreatePage() {
               <label className="block font-semibold mb-1 text-slate-700">Тип уроку</label>
               <select
                 value={lesson.type}
-                onChange={e => handleFieldChange('type', e.target.value as 'TEXT' | 'VIDEO' | 'LINK')}
+                onChange={e => handleFieldChange('type', e.target.value)}
                 className="w-full rounded-[10px] ring-1 ring-[#E5ECFF] px-3 py-2 outline-none focus:ring-[#1345DE]"
               >
                 <option value="TEXT">Текст</option>
@@ -294,12 +210,10 @@ export default function LessonCreatePage() {
             <label className="block font-semibold mb-1 text-slate-700">Обкладинка</label>
             <div className="flex items-center gap-4">
               <input type="file" onChange={handleCoverChange} className="rounded-[10px] ring-1 ring-[#E5ECFF] px-3 py-2" />
-              {lesson.cover_image && coverPreview && (
+              {lesson.cover_image && (
                 <div className="flex items-center gap-2">
-                  <img src={coverPreview} alt="Preview" className="w-32 h-20 object-cover rounded-md" />
-                  <button onClick={removeCover} className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">
-                    Видалити
-                  </button>
+                  <img src={URL.createObjectURL(lesson.cover_image)} alt="Preview" className="w-32 h-20 object-cover rounded-md" />
+                  <button onClick={removeCover} className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">Видалити</button>
                 </div>
               )}
             </div>

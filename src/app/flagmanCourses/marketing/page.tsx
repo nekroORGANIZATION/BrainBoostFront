@@ -6,6 +6,7 @@ import { Star, Calendar, Clock, Video } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronDown, BookOpen, CheckSquare, Users, Award ,BarChart, Youtube, MonitorCheck, Search, Target, Mail, Puzzle, Megaphone, Lightbulb } from "lucide-react";
+import { FaFacebookF, FaYoutube, FaTelegramPlane, FaInstagram, FaTiktok } from "react-icons/fa";
 import FooterCard from '@/components/FooterCard';
 
 const fadeUp: Variants = {
@@ -1002,7 +1003,7 @@ function InstallmentSection() {
 function BookingSection() {
   const API_URL =
     process.env.NEXT_PUBLIC_CONTACTS_API ||
-    "https://brainboost.pp.ua/api/api/contacts/";
+    "http://127.0.0.1:8000/api/contacts/";
 
   const [form, setForm] = React.useState({ name: "", email: "", phone: "" });
   const [loading, setLoading] = React.useState(false);

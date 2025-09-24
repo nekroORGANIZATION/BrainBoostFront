@@ -225,7 +225,7 @@ export default function CoursePublishPage(){
                         <div className="text-sm font-medium text-[#0F2E64] truncate">{ls.title}</div>
                         {ls.status && <div className="text-xs text-slate-500">Статус: {ls.status}</div>}
                       </div>
-                      <Link href={`/teacher/courses/${courseId}/builder/lessons/${ls.id}`} className="text-indigo-600 text-sm hover:underline">Редагувати</Link>
+                      <Link href={`/teacher/courses/${courseId}/builder/lessons/${ls.id}/edit`} className="text-indigo-600 text-sm hover:underline">Редагувати</Link>
                     </div>
                   ))}
                 </div>
@@ -269,10 +269,7 @@ export default function CoursePublishPage(){
                 </button>
               </div>
 
-              <div className="mt-4 text-xs text-slate-600 flex items-start gap-2">
-                <Info className="w-4 h-4 mt-0.5"/>
-                <span>Публікація змінює лише статус курсу на бекенді (<code>/api/courses/{'{id}'}/</code>). Якщо хочеш планування — додамо поле <code>scheduled_at</code> в модель курсу окремо.</span>
-              </div>
+
             </div>
 
             <div className="rounded-2xl bg-white/95 ring-1 ring-[#E5ECFF] p-4 shadow-lg">
@@ -280,7 +277,6 @@ export default function CoursePublishPage(){
               <div className="grid gap-2">
                 <Link href={`/teacher/courses/${courseId}/builder/overview`} className="px-3 py-2 rounded-xl ring-1 ring-[#E5ECFF] text-center hover:shadow-md transition">← До Hub</Link>
                 <Link href={`/teacher/courses/${courseId}/builder/lessons`} className="px-3 py-2 rounded-xl ring-1 ring-[#E5ECFF] text-center hover:shadow-md transition">До розділів/уроків →</Link>
-                <Link href={`/teacher/courses/${courseId}/builder/assessments`} className="px-3 py-2 rounded-xl ring-1 ring-[#E5ECFF] text-center hover:shadow-md transition">Оцінювання</Link>
               </div>
             </div>
           </aside>

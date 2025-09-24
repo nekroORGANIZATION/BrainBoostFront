@@ -6,7 +6,7 @@ import Link from 'next/link';
 /* ===== API ===== */
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, '') ||
-  'https://brainboost.pp.ua/api'; // <- ВАЖНО: тут есть /api
+  'http://127.0.0.1:8000'; // <- ВАЖНО: тут есть /api
 
 const ENDPOINT_LIST   = `${API_BASE}/accounts/certificates/my-completed-courses/`;
 const ENDPOINT_ISSUE  = (courseId: number) => `${API_BASE}/accounts/certificates/issue/${courseId}/`;

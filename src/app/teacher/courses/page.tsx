@@ -346,7 +346,10 @@ export default function TeacherMyCoursesPage() {
                     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                       <Link href={`${base}/assessments`} className="text-[#1345DE] hover:underline">Тести</Link>
                       <span className="text-slate-400">·</span>
-                      <Link href={`${base}/students`} className="text-[#1345DE] hover:underline">Студенти</Link>
+                      <Link href={`/teacher/courses/${c.id}/students`} className="text-[#1345DE] hover:underline">
+                        Студенти
+                      </Link>
+
                       <span className="text-slate-400">·</span>
                       <Link href={`/courses/${c.id}`} className="text-[#1345DE] hover:underline">Перегляд</Link>
                       <span className="text-slate-400">·</span>

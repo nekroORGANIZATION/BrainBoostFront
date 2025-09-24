@@ -43,7 +43,7 @@ type AttemptDTO = {
 };
 
 /* ====== util ====== */
-const API = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
 const fmt = (n:number, d=0)=> Number.isFinite(n)? n.toFixed(d) : '—';
 const dt = (iso?:string|null)=> iso ? new Date(iso).toLocaleString('uk-UA') : '—';
 const secToMin = (s?:number|null)=> (s ?? 0) > 0 ? Math.round((s as number)/60) : 0;

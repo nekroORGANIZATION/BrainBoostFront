@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API = 'https://brainboost.pp.ua/api/api/tests';
+const API = 'http://127.0.0.1:8000/api/tests';
 
 export const getTests = async () => {
   const res = await axios.get(`${API}/tests/`);

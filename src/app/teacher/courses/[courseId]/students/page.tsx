@@ -6,43 +6,78 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import http, { setAuthHeader } from '@/lib/http';
 import {
-  UserPlus, Users, Search, Download, Upload, Loader2, Mail, CheckCircle2, XCircle,
-  ChevronLeft, ArrowLeftRight, Filter, Trash2, Eye, BarChart3, Shield, RefreshCcw,
-  MoreHorizontal, Sparkles, AlertTriangle
+  UserPlus, Users, Search, Download, Upload, Loader2, Mail,
+  ChevronLeft, Trash2, BarChart3, AlertTriangle
 } from 'lucide-react';
 
-/* ===================== endpoints (підігнати під свій бек) ===================== */
-const API_LIST = (courseId:number)=> `/course/admin/courses/${courseId}/students/`;                  // GET
-const API_INVITE = (courseId:number)=> `/course/admin/courses/${courseId}/students/invite/`;         // POST {email}
-const API_DELETE = (courseId:number, enrollmentId:number)=> `/course/admin/courses/${courseId}/students/${enrollmentId}/`; // DELETE
-const API_EXPORT = (courseId:number)=> `/course/admin/courses/${courseId}/students/export/`;         // (optional) GET csv
+/* ===================== endpoints (універсальні кандидати) ===================== */
+// Повертають список студентів/енролів/покупок за курсом
+const listCandidates = (courseId:number) => [
+  // students під курсом
+  `/course/admin/courses/${courseId}/students/`,
+  `/courses/admin/courses/${courseId}/students/`,
+  `/api/courses/${courseId}/students/`,
+  // enrollments під курсом
+  `/course/admin/courses/${courseId}/enrollments/`,
+  `/courses/admin/courses/${courseId}/enrollments/`,
+  `/api/courses/${courseId}/enrollments/`,
+  // purchases (PurchasedCourse) під курсом
+  `/course/admin/courses/${courseId}/purchases/`,
+  `/courses/admin/courses/${courseId}/purchases/`,
+  `/api/courses/${courseId}/purchases/`,
+  // "плоскі" варіанти з фільтром course
+  `/course/admin/students/`,
+  `/courses/admin/students/`,
+  `/api/courses/students/`,
+  `/course/admin/enrollments/`,
+  `/courses/admin/enrollments/`,
+  `/api/courses/enrollments/`,
+  `/course/admin/purchases/`,
+  `/courses/admin/purchases/`,
+  `/api/courses/purchases/`,
+];
+
+// запрошення (e-mail)
+const API_INVITE = (courseId:number)=> `/course/admin/courses/${courseId}/students/invite/`;
+// видалення запису (enrollment/student row)
+const API_DELETE = (courseId:number, rowId:number)=> `/course/admin/courses/${courseId}/students/${rowId}/`;
+// (optional) серверний експорт CSV
+const API_EXPORT = (courseId:number)=> `/course/admin/courses/${courseId}/students/export/`;
 
 /* ===================== types ===================== */
 type EnrollmentStatus = 'active'|'invited'|'completed'|'blocked';
+
 type StudentRow = {
-  id: number;                        // enrollment id
+  id: number;               // enrollmentId / purchaseId / students row id
   user_id: number;
   full_name: string;
   email: string;
   status: EnrollmentStatus;
-  progress_pct?: number;             // 0..100
-  avg_score?: number | null;         // 0..100
+  progress_pct?: number;    // 0..100
+  avg_score?: number|null;  // 0..100
   attempts_total?: number;
-  last_seen?: string | null;
+  last_seen?: string|null;
 };
 
 type ListResp = {
   count: number;
   next?: string|null;
   previous?: string|null;
-  results: StudentRow[];
-};
+  results: any[];
+} | any[];
 
 /* ===================== helpers ===================== */
 function asArray<T=any>(raw:any): T[] {
   if (Array.isArray(raw)) return raw as T[];
   if (raw?.results && Array.isArray(raw.results)) return raw.results as T[];
   return [];
+}
+async function requestFirst<T=any>(calls: Array<() => Promise<any>>): Promise<T> {
+  let lastErr:any;
+  for (const fn of calls) {
+    try { const r = await fn(); return r.data; } catch (e:any) { lastErr = e; }
+  }
+  throw lastErr;
 }
 function prettyError(e:any){
   const d = e?.response?.data; const s = e?.response?.status;
@@ -62,6 +97,61 @@ function download(filename:string, content:string, type='text/csv;charset=utf-8'
   const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click();
   a.remove(); URL.revokeObjectURL(url);
+}
+
+/** Нормалізація різних беків у StudentRow */
+function normalizeToRow(e:any): StudentRow {
+  // Кандидати джерел user
+  const user = e.user ?? e.account ?? e.owner ?? null;
+
+  const userId =
+    e.user_id ?? e.userId ?? user?.id ?? user?.pk ?? e.account_id ?? e.owner_id;
+
+  const email =
+    e.email ?? user?.email ?? user?.username ?? '';
+    
+const nameFromParts = [user?.first_name, user?.last_name].filter(Boolean).join(' ').trim();
+
+const full_name =
+  e.full_name ??
+  user?.full_name ??
+  (nameFromParts || undefined) ??   // ← обгорнули у дужки
+  user?.name ??
+  email ??
+  '(без імені)';
+
+  // PurchasedCourse → is_active / purchased_at
+  const purchasedActive = typeof e.is_active === 'boolean' ? e.is_active : undefined;
+  const purchasedAt = e.purchased_at ?? e.created_at ?? null;
+
+  // enrollments/students → progress/score/attempts/last_seen
+  const progress = e.progress_pct ?? e.progress ?? 0;
+  const avgScore = e.avg_score ?? e.average_score ?? null;
+  const attempts = e.attempts_total ?? e.attempts ?? 0;
+  const lastSeen = e.last_seen ?? e.updated_at ?? purchasedAt ?? null;
+
+  // status guessing:
+  let status: EnrollmentStatus = 'active';
+  if (typeof e.status === 'string') {
+    const s = e.status.toLowerCase();
+    if (['active','invited','completed','blocked'].includes(s)) status = s as EnrollmentStatus;
+  } else if (purchasedActive === false) {
+    status = 'blocked';
+  } else if (purchasedActive === true) {
+    status = 'active';
+  }
+
+  return {
+    id: e.id ?? e.enrollment_id ?? e.pk ?? e.purchase_id ?? Number(`${userId || 0}${Date.now()}`),
+    user_id: Number(userId || 0),
+    full_name,
+    email,
+    status,
+    progress_pct: Number.isFinite(progress) ? Number(progress) : 0,
+    avg_score: avgScore==null ? null : Number(avgScore),
+    attempts_total: Number.isFinite(attempts) ? Number(attempts) : 0,
+    last_seen: lastSeen ? String(lastSeen) : null,
+  };
 }
 
 /* ===================== page ===================== */
@@ -94,31 +184,37 @@ export default function StudentsPage(){
 
   useEffect(()=>{ if(accessToken) setAuthHeader(accessToken); }, [accessToken]);
 
-  // fetch list
+  // fetch list (пробуємо кілька endpointів, включно з PurchasedCourse)
   useEffect(()=>{
     if (!courseId || !accessToken) return;
     (async()=>{
       try{
         setLoading(true); setErr(null);
-        const r = await http.get(API_LIST(courseId), {
-          params: {
-            page, page_size: pageSize,
-            search: (search||undefined),
-            status: (status||undefined),
-            ordering: (
-              ordering === 'name' ? 'full_name'
-              : ordering === 'progress' ? '-progress_pct'
-              : ordering === 'score' ? '-avg_score'
-              : '-last_seen'
-            )
-          }
-        });
-        const data: ListResp = r.data?.results ? r.data : { count: r.data?.count ?? asArray(r.data).length, results: asArray(r.data) };
-        setItems(data.results || []);
-        setCount(data.count || (data.results?.length ?? 0));
+        const params = {
+          page, page_size: pageSize,
+          search: (search||undefined),
+          status: (status||undefined),
+          ordering: (
+            ordering === 'name' ? 'full_name'
+            : ordering === 'progress' ? '-progress_pct'
+            : ordering === 'score' ? '-avg_score'
+            : '-last_seen'
+          )
+        };
+
+        const candidates = listCandidates(courseId);
+        const data = await requestFirst<ListResp>(candidates.map(url => () => http.get(url, { params })));
+
+        const raw = asArray<any>(data);
+        const list = raw.map(normalizeToRow);
+        const total = Array.isArray(data) ? list.length : (data as any)?.count ?? list.length;
+
+        setItems(list);
+        setCount(total);
         setSelected(new Set());
       }catch(e:any){
         setErr(prettyError(e));
+        setItems([]); setCount(0);
       }finally{
         setLoading(false);
       }
@@ -127,13 +223,8 @@ export default function StudentsPage(){
 
   const pages = Math.max(1, Math.ceil(count / pageSize));
   const allSelected = items.length>0 && items.every(i => selected.has(i.id));
-  const toggleAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(items.map(i=>i.id)));
-  };
-  const toggleOne = (id:number) => {
-    const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next);
-  };
+  const toggleAll = () => { if (allSelected) setSelected(new Set()); else setSelected(new Set(items.map(i=>i.id))); };
+  const toggleOne = (id:number) => { const next = new Set(selected); next.has(id) ? next.delete(id) : next.add(id); setSelected(next); };
 
   async function inviteOne(email:string){
     if (!email.trim()) return;
@@ -141,9 +232,7 @@ export default function StudentsPage(){
       setBusy(true); setErr(null); setOk(null);
       await http.post(API_INVITE(courseId), { email: email.trim() });
       setOk(`Запрошення надіслано: ${email.trim()}`);
-      setInviteEmail('');
-      setShowInvite(false);
-      // refresh
+      setInviteEmail(''); setShowInvite(false);
       setPage(1);
     }catch(e:any){ setErr(prettyError(e)); }
     finally{ setBusy(false); }
@@ -174,7 +263,7 @@ export default function StudentsPage(){
         a.href = url; a.download = `students_${courseId}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
         setBusy(false); return;
       }catch{ /* fallback нижче */ }
-      // fallback — генеруємо самі з поточного набору (краще робити запит без пагінації)
+      // fallback — генеруємо самі з поточного набору (краще зробити окремий запит без пагінації)
       const csv = toCSV(items);
       download(`students_page${page}.csv`, csv);
       setOk('Експортовано CSV (поточна сторінка).');
@@ -341,18 +430,23 @@ export default function StudentsPage(){
                       <td className="p-3">
                         <StatusBadge status={row.status}/>
                       </td>
-                      <td className="p-3">
-                        <ProgressBar value={Math.round(row.progress_pct ?? 0)}/>
-                      </td>
+                      <td className="p-3"><ProgressBar value={Math.round(row.progress_pct ?? 0)}/></td>
                       <td className="p-3">{row.avg_score!=null ? `${Math.round(row.avg_score)}%` : '—'}</td>
                       <td className="p-3">{row.attempts_total ?? 0}</td>
                       <td className="p-3 text-slate-500">{row.last_seen ? new Date(row.last_seen).toLocaleString('uk-UA') : '—'}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <Link href={`/teacher/courses/${courseId}/builder/assessments/attempts?user=${row.user_id}`} className="px-2 py-1 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-1 text-xs">
+                          <Link
+                            href={`/teacher/courses/${courseId}/builder/assessments/attempts?user=${row.user_id}`}
+                            className="px-2 py-1 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-1 text-xs"
+                          >
                             <BarChart3 className="w-4 h-4"/> Cпроби
                           </Link>
-                          <button title="Видалити" onClick={async()=>{ if(!confirm(`Видалити ${row.full_name || row.email}?`)) return; try{ await http.delete(API_DELETE(courseId, row.id)); setItems(prev=>prev.filter(x=>x.id!==row.id)); setCount(c=>Math.max(0,c-1)); }catch(e:any){ setErr(prettyError(e)); } }} className="px-2 py-1 rounded-lg ring-1 ring-red-200 text-red-700 bg-white inline-flex items-center gap-1 text-xs">
+                          <button
+                            title="Видалити"
+                            onClick={async()=>{ if(!confirm(`Видалити ${row.full_name || row.email}?`)) return; try{ await http.delete(API_DELETE(courseId, row.id)); setItems(prev=>prev.filter(x=>x.id!==row.id)); setCount(c=>Math.max(0,c-1)); }catch(e:any){ setErr(prettyError(e)); } }}
+                            className="px-2 py-1 rounded-lg ring-1 ring-red-200 text-red-700 bg-white inline-flex items-center gap-1 text-xs"
+                          >
                             <Trash2 className="w-4 h-4"/>
                           </button>
                         </div>

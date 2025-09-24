@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: "https://brainboost.pp.ua/api/",
+  baseURL: "http://127.0.0.1:8000/",
   headers: {
     "Content-Type": "application/json",
   },
@@ -30,7 +30,7 @@ axiosInstance.interceptors.response.use(
     ) {
       originalRequest._retry = true;
       try {
-        const res = await axios.post("https://brainboost.pp.ua/api/accounts/api/token/refresh/", {
+        const res = await axios.post("http://127.0.0.1:8000/accounts/api/token/refresh/", {
           refresh: localStorage.getItem("refresh"),
         });
         localStorage.setItem("access", res.data.access);

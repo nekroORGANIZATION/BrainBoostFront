@@ -36,7 +36,7 @@ async function uploadImageSmart(file: File): Promise<string> {
       const d = r.data || {};
       const u = d.url || d.file || d.path || d.location;
       if (u) {
-        const base = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+        const base = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
         return String(u).startsWith('http') ? String(u) : `${base}${String(u).startsWith('/') ? '' : '/'}${u}`;
       }
     } catch {}

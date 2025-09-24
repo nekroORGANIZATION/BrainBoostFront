@@ -132,6 +132,51 @@ export default function ProgramPage() {
   // створення уроку: id модуля в процесі
   const [busyCreateId, setBusyCreateId] = useState<number | null>(null);
 
+  async function saveOrder() {
+  setReorderSaving(true);
+  setErr(null);
+
+  const payload = modules.map(m => ({ id: m.id, order: m.order }));
+  const batch = urlVariants('/admin/modules/reorder/');
+
+  let done = false;
+  let lastError: string | null = null;
+
+  // пробуємо батч-ендпоінт
+  for (const url of batch) {
+    try {
+      await http.post(url, { items: payload });
+      done = true;
+      break;
+    } catch (e: any) {
+      lastError = `${url} → ${httpErrStr(e)}`;
+    }
+  }
+
+  // фолбек: по одному модулю
+  if (!done) {
+    for (const it of payload) {
+      const single = urlVariants(`/admin/modules/${it.id}/`);
+      let ok = false;
+      for (const u of single) {
+        try {
+          await http.patch(u, { order: it.order });
+          ok = true;
+          break;
+        } catch {}
+      }
+      if (!ok) {
+        setErr(`Частково збережено порядок. Перевір API. Остання помилка: ${lastError || ''}`);
+        break;
+      }
+    }
+  }
+
+  setReorderSaving(false);
+  setOrderDirty(false);
+}
+
+
   useEffect(() => {
     if (accessToken) setAuthHeader(accessToken);
   }, [accessToken]);
@@ -437,44 +482,6 @@ export default function ProgramPage() {
     setOrderDirty(true);
   }
 
-  async function saveOrder() {
-    setReorderSaving(true);
-    setErr(null);
-
-    const payload = modules.map(m => ({ id: m.id, order: m.order }));
-    const batch = urlVariants('/admin/modules/reorder/');
-
-    let done = false;
-    let lastError: string | null = null;
-    for (const url of batch) {
-      try {
-        await http.post(url, { items: payload });
-        done = true;
-        break;
-      } catch (e: any) {
-        lastError = `${url} → ${httpErrStr(e)}`;
-      }
-    }
-
-    if (!done) {
-      for (const it of payload) {
-        const single = urlVariants(`/admin/modules/${it.id}/`);
-        let ok = false;
-        for (const u of single) {
-          try {
-            await http.patch(u, { order: it.order });
-            ok = true;
-            break;
-          } catch {}
-        }
-        if (!ok) setErr(`Частково збережено порядок. Перевір API. Остання помилка: ${lastError || ''}`);
-      }
-    }
-
-    setReorderSaving(false);
-    setOrderDirty(false);
-  }
-
   /* ---------- create lesson inside module + redirect ---------- */
   function createLessonInModule(m: Module) {
     setBusyCreateId(m.id);
@@ -528,15 +535,11 @@ export default function ProgramPage() {
             <h1 className="text-[28px] sm:text-[36px] font-extrabold text-[#0F2E64] truncate">Програма курсу</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusPill status={course?.status} />
-              <Pill tone="blue">Курс ID: {courseId}</Pill>
               <Pill tone="slate">Створено: {formatDate(course?.created_at)}</Pill>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Link href={`/courses/${courseId}`} className="px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2">
-              <BookOpen className="w-4 h-4" /> Попередній перегляд
-            </Link>
             <Link href={`/teacher/courses/${courseId}/builder/publish`} className="px-4 py-2 rounded-xl bg-[#1345DE] text-white inline-flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4" /> До публікації
             </Link>
@@ -551,7 +554,7 @@ export default function ProgramPage() {
         )}
 
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr] gap-6">
-          {/* LEFT: modules list + lessons */}
+          {/* LEFT: modules list + lessons ——— ONLY VISUAL TWEAKS BELOW */}
           <div className="space-y-4">
             <Card>
               <div className="flex items-center justify-between gap-3">
@@ -574,7 +577,7 @@ export default function ProgramPage() {
               )}
 
               {state !== 'loading' && modules.length > 0 && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 space-y-3">
                   {modules.map((m, idx) => {
                     const lessons = lessonsByModule[String(m.id)] || [];
                     const isOpen = !!expanded[m.id];
@@ -583,118 +586,126 @@ export default function ProgramPage() {
                     return (
                       <div
                         key={m.id}
-                        className="group rounded-xl ring-1 ring-[#E5ECFF] bg-white p-3 hover:shadow transition"
+                        className="group rounded-2xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#cfd9ff] transition-shadow shadow-[0_6px_16px_rgba(2,28,78,0.06)] hover:shadow-[0_12px_28px_rgba(2,28,78,0.10)]"
                         draggable
                         onDragStart={() => { onDragStart(idx); }}
                         onDragOver={onDragOver}
                         onDrop={() => onDrop(idx)}
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="pt-1 cursor-grab active:cursor-grabbing text-slate-400 group-hover:text-slate-600">
-                            <GripVertical className="w-4 h-4" />
-                          </div>
+                        {/* decorative gradient (no pointer events) */}
+                        <div className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+                             style={{ background: 'radial-gradient(700px 120px at 0% -10%, rgba(19,69,222,0.06), transparent 60%), radial-gradient(500px 90px at 110% -10%, rgba(16,185,129,0.06), transparent 60%)' }}/>
+                        <div className="relative">
+                          {/* Header row */}
+                          <div className="px-3 sm:px-4 py-3 sm:py-4 border-b border-[#EEF3FF] bg-white/70 rounded-t-2xl">
+                            <div className="flex items-start gap-3">
+                              <div className="pt-1 cursor-grab active:cursor-grabbing text-slate-400 group-hover:text-slate-600">
+                                <GripVertical className="w-4 h-4" />
+                              </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="font-semibold text-[#0F2E64] truncate">{m.title}</div>
-                              {m.is_visible ? <Pill tone="green">Видимий</Pill> : <Pill tone="slate">Прихований</Pill>}
-                              <Pill tone="blue">#{m.order}</Pill>
-                              <Pill tone="violet"><ListChecks className="w-3.5 h-3.5 inline -mt-1 mr-1" />{lessons.length} уроків</Pill>
-                            </div>
-                            {m.description ? (
-                              <div className="text-sm text-slate-600 line-clamp-2">{m.description}</div>
-                            ) : null}
-
-                            {/* Actions */}
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingId(m.id);
-                                  setTitle(m.title);
-                                  setDescription(m.description || '');
-                                  setVisible(!!m.is_visible);
-                                }}
-                                className="px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2"
-                              >
-                                <Pencil className="w-4 h-4" /> Редагувати розділ
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => createLessonInModule(m)}
-                                disabled={busyCreateId === m.id}
-                                className="px-3 py-1.5 rounded-xl bg-[#1345DE] text-white inline-flex items-center gap-2 disabled:opacity-60"
-                              >
-                                <Plus className="w-4 h-4" /> {busyCreateId === m.id ? 'Створюємо…' : 'Створити урок'}
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => deleteModule(m)}
-                                className="px-3 py-1.5 rounded-xl ring-1 ring-red-200 text-red-700 bg-white inline-flex items-center gap-2"
-                              >
-                                <Trash2 className="w-4 h-4" /> Видалити
-                              </button>
-
-                              {lessons.length > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => setExpanded(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
-                                  className="px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2"
-                                >
-                                  <Eye className="w-4 h-4" />{isOpen ? 'Згорнути' : `Показати всі (${lessons.length})`}
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Lessons list */}
-                            <div className="mt-3">
-                              {lessonsLoading && lessons.length === 0 ? (
-                                <div className="space-y-2">
-                                  {[...Array(3)].map((_, i) => (
-                                    <div key={i} className="h-10 rounded-lg bg-slate-100 animate-pulse" />
-                                  ))}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="font-semibold text-[#0F2E64] truncate text-[15px] sm:text-[16px]">{m.title}</div>
+                                  {m.is_visible ? <Pill tone="green">Видимий</Pill> : <Pill tone="slate">Прихований</Pill>}
+                                  <Pill tone="blue">#{m.order}</Pill>
+                                  <Pill tone="violet"><ListChecks className="w-3.5 h-3.5 inline -mt-1 mr-1" />{lessons.length} уроків</Pill>
                                 </div>
-                              ) : lessons.length === 0 ? (
-                                <div className="text-sm text-slate-500">У цьому розділі поки немає уроків.</div>
-                              ) : (
-                                <ul className="divide-y divide-[#EEF3FF] rounded-xl ring-1 ring-[#EEF3FF]">
-                                  {visibleLessons.map(l => (
-                                    <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white">
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm text-slate-900 font-medium truncate">{l.title}</span>
-                                          <span className="text-xs text-slate-500">#{l.order}</span>
-                                          <LessonStatusPill status={l.status} />
-                                          {typeof l.duration_min === 'number' ? <Pill tone="slate">{l.duration_min} хв</Pill> : null}
-                                        </div>
-                                        {l.summary ? (
-                                          <div className="text-xs text-slate-500 line-clamp-1">{l.summary}</div>
-                                        ) : null}
-                                      </div>
-                                      <div className="shrink-0 flex gap-2">
-                                        <Link
-                                          href={`/teacher/courses/${courseId}/builder/lessons/${l.id}/edit`}
-                                          className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2"
-                                        >
-                                          <Pencil className="w-4 h-4" /> Редагувати
-                                        </Link>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
+                                {m.description ? (
+                                  <div className="text-sm text-slate-600/90 line-clamp-2 mt-0.5">{m.description}</div>
+                                ) : null}
+                              </div>
+
+                              <div className="flex flex-col gap-1 shrink-0">
+                                <button type="button" onClick={() => move(idx, -1)} className="px-2 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white hover:ring-[#cdd9ff]" title="Вище">
+                                  <ArrowUp className="w-4 h-4" />
+                                </button>
+                                <button type="button" onClick={() => move(idx, 1)} className="px-2 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white hover:ring-[#cdd9ff]" title="Нижче">
+                                  <ArrowDown className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="flex flex-col gap-1 shrink-0">
-                            <button type="button" onClick={() => move(idx, -1)} className="px-2 py-1 rounded-lg ring-1 ring-[#E5ECFF] bg-white" title="Вище">
-                              <ArrowUp className="w-4 h-4" />
+                          {/* Actions */}
+                          <div className="px-3 sm:px-4 py-3 flex flex-wrap gap-2 bg-white/80">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(m.id);
+                                setTitle(m.title);
+                                setDescription(m.description || '');
+                                setVisible(!!m.is_visible);
+                              }}
+                              className="px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2 hover:ring-[#cdd9ff]"
+                            >
+                              <Pencil className="w-4 h-4" /> Редагувати розділ
                             </button>
-                            <button type="button" onClick={() => move(idx, 1)} className="px-2 py-1 rounded-lg ring-1 ring-[#E5ECFF] bg-white" title="Нижче">
-                              <ArrowDown className="w-4 h-4" />
+
+                            <button
+                              type="button"
+                              onClick={() => createLessonInModule(m)}
+                              disabled={busyCreateId === m.id}
+                              className="px-3 py-1.5 rounded-xl bg-[#1345DE] text-white inline-flex items-center gap-2 disabled:opacity-60"
+                            >
+                              <Plus className="w-4 h-4" /> {busyCreateId === m.id ? 'Створюємо…' : 'Створити урок'}
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteModule(m)}
+                              className="px-3 py-1.5 rounded-xl ring-1 ring-red-200 text-red-700 bg-white inline-flex items-center gap-2 hover:ring-red-300"
+                            >
+                              <Trash2 className="w-4 h-4" /> Видалити
+                            </button>
+
+                            {lessons.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setExpanded(prev => ({ ...prev, [m.id]: !prev[m.id] }))}
+                                className="ml-auto px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2 hover:ring-[#cdd9ff]"
+                              >
+                                <Eye className="w-4 h-4" />{isOpen ? 'Згорнути' : `Показати всі (${lessons.length})`}
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Lessons list */}
+                          <div className="px-3 sm:px-4 pb-3">
+                            {lessonsLoading && lessons.length === 0 ? (
+                              <div className="space-y-2">
+                                {[...Array(3)].map((_, i) => (
+                                  <div key={i} className="h-10 rounded-lg bg-slate-100 animate-pulse" />
+                                ))}
+                              </div>
+                            ) : lessons.length === 0 ? (
+                              <div className="text-sm text-slate-500 px-1 py-2">У цьому розділі поки немає уроків.</div>
+                            ) : (
+                              <ul className="divide-y divide-[#EEF3FF] rounded-xl ring-1 ring-[#EEF3FF] overflow-hidden">
+                                {visibleLessons.map(l => (
+                                  <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white transition hover:bg-slate-50">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-sm text-slate-900 font-medium truncate">{l.title}</span>
+                                        <span className="text-xs text-slate-500">#{l.order}</span>
+                                        <LessonStatusPill status={l.status} />
+                                        {typeof l.duration_min === 'number' ? <Pill tone="slate">{l.duration_min} хв</Pill> : null}
+                                      </div>
+                                      {l.summary ? (
+                                        <div className="text-xs text-slate-500 line-clamp-1">{l.summary}</div>
+                                      ) : null}
+                                    </div>
+                                    <div className="shrink-0 flex gap-2">
+                                      <Link
+                                        href={`/teacher/courses/${courseId}/builder/lessons/${l.id}/edit`}
+                                        className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2 hover:ring-[#cdd9ff]"
+                                      >
+                                        <Pencil className="w-4 h-4" /> Редагувати
+                                      </Link>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -724,15 +735,15 @@ export default function ProgramPage() {
               )}
             </Card>
 
-            {/* Unassigned lessons */}
+            {/* Unassigned lessons (без змін логіки) */}
             {unassignedLessons.length > 0 && (
               <Card>
                 <h3 className="text-[#0F2E64] font-extrabold text-[18px]">
                   Уроки без розділу <Pill tone="violet">{unassignedLessons.length}</Pill>
                 </h3>
-                <ul className="mt-3 divide-y divide-[#EEF3FF] rounded-xl ring-1 ring-[#EEF3FF]">
+                <ul className="mt-3 divide-y divide-[#EEF3FF] rounded-xl ring-1 ring-[#EEF3FF] overflow-hidden">
                   {unassignedLessons.map(l => (
-                    <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white">
+                    <li key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 bg-white hover:bg-slate-50 transition">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-slate-900 font-medium truncate">{l.title}</span>
@@ -744,7 +755,7 @@ export default function ProgramPage() {
                       </div>
                       <Link
                         href={`/teacher/courses/${courseId}/builder/lessons/${l.id}/edit`}
-                        className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2"
+                        className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] bg-white inline-flex items-center gap-2 hover:ring-[#cdd9ff]"
                       >
                         <Pencil className="w-4 h-4" /> Редагувати
                       </Link>
@@ -755,7 +766,7 @@ export default function ProgramPage() {
             )}
           </div>
 
-          {/* RIGHT: form */}
+          {/* RIGHT: form (unchanged) */}
           <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
             <Card>
               <h3 className="text-[#0F2E64] font-extrabold text-[18px]">{editingId ? 'Редагувати розділ' : 'Створити розділ'}</h3>

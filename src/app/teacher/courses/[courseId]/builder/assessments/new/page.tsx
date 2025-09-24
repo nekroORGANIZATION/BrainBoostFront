@@ -73,7 +73,7 @@ type TestDTO = {
 /* =====================================================
    Helpers
 ===================================================== */
-const API = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+const API = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
 
 const emptyQuestion = (seq:number): QuestionUI => ({
   id: seq,
@@ -369,7 +369,6 @@ export default function TestNewPage(){
             </div>
             <div className="flex flex-wrap gap-2">
               <button onClick={saveNow} disabled={!canSave} className="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm inline-flex items-center gap-2 disabled:opacity-60 hover:shadow-md transition"><Save className="w-4 h-4"/> Зберегти</button>
-              <button onClick={()=>setShowPreview(true)} className="px-3 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white text-sm inline-flex items-center gap-2 hover:shadow-sm transition"><Play className="w-4 h-4"/> Прев’ю</button>
               <Link href={`/teacher/courses/${courseId}/builder/assessments`} className="px-3 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white text-sm inline-flex items-center gap-2 hover:shadow-sm transition"><ChevronLeft className="w-4 h-4"/> Список</Link>
             </div>
           </div>

@@ -341,7 +341,6 @@ export default function BuilderOverviewPage() {
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusPill status={course?.status} />
-              <Pill tone="blue">ID: {courseId || '—'}</Pill>
               <Pill tone="slate">Створено: {formatDate(course?.created_at)}</Pill>
             </div>
           </div>

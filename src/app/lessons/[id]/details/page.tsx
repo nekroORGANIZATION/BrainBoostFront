@@ -56,10 +56,10 @@ export default function LessonDetailsPage() {
     setLoading(true);
 
     // 1️⃣ Завантажуємо сам урок
-    const lessonReq = axios.get(`http://127.0.0.1:8000/api/lesson/admin/lessons/${id}/`, { headers });
+    const lessonReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/admin/lessons/${id}/`, { headers });
 
     // 2️⃣ Завантажуємо теорії окремо
-    const theoriesReq = axios.get(`http://127.0.0.1:8000/api/lesson/lesson/theories/${id}/`, { headers });
+    const theoriesReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers });
 
     Promise.all([lessonReq, theoriesReq])
       .then(([lessonRes, theoriesRes]) => {
@@ -82,7 +82,7 @@ export default function LessonDetailsPage() {
     if (!token) return;
 
     axios
-      .get(`http://127.0.0.1:8000/api/tests/?lesson_id=${lesson.id}`, {
+      .get(`https://brainboost.pp.ua/api/api/tests/?lesson_id=${lesson.id}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
       .then((res) => {
@@ -118,7 +118,7 @@ export default function LessonDetailsPage() {
           />
           {lesson.theories[lesson.theories.length - 1].image && (
             <img
-              src={`http://127.0.0.1:8000${lesson.theories[lesson.theories.length - 1].image}`}
+              src={`https://brainboost.pp.ua/api${lesson.theories[lesson.theories.length - 1].image}`}
               alt="Ілюстрація до теорії"
               className="mt-4 rounded shadow"
             />

@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import http from '@/lib/http';
-import { mediaUrl } from '@/lib/api';
+import { mediaUrl } from '@/lib/media';
 
 type Story = {
   id: number;

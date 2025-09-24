@@ -1,4 +1,4 @@
-// BubbleMenu.tsx
+// BubbleMenu.tsx .. 
 import React, { useEffect, useState, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 

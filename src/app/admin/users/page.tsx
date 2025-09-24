@@ -4,30 +4,47 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+/** ===================== CONFIG ===================== */
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? 'https://brainboost.pp.ua/api')
+  .replace(/\/+$/, ''); // убрать конечные слеши
 
-// ===== Types =====
+/** ===================== TYPES ===================== */
 type User = {
   id: number;
   username: string;
-  email?: string;
+  email?: string | null;
   is_teacher?: boolean;
   is_superuser?: boolean;
   is_email_verified?: boolean;
-  date_joined?: string;
+  date_joined?: string | null;
 };
 
-// ===== UI small =====
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+type AuthCtx = {
+  isAuthenticated: boolean;
+  accessToken: string | null;
+  user?: { username?: string; is_superuser?: boolean } | null;
+};
+
+/** ===================== UI PRIMITIVES ===================== */
+type CardProps = { children: React.ReactNode; className?: string };
+function Card({ children, className = '' }: CardProps) {
   return (
-    <div className={`rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)] ${className}`}>
+    <div
+      className={[
+        'rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5',
+        'shadow-[0_8px_24px_rgba(2,28,78,0.06)]',
+        className,
+      ].join(' ')}
+    >
       {children}
     </div>
   );
 }
 
-function Badge({ children, tone = 'slate' as 'slate'|'emerald'|'rose'|'amber' }) {
-  const map: Record<string, string> = {
+type BadgeTone = 'slate' | 'emerald' | 'rose' | 'amber';
+type BadgeProps = { children: React.ReactNode; tone?: BadgeTone };
+function Badge({ children, tone = 'slate' }: BadgeProps) {
+  const map: Record<BadgeTone, string> = {
     slate: 'bg-slate-100 text-slate-700',
     emerald: 'bg-emerald-100 text-emerald-700',
     rose: 'bg-rose-100 text-rose-700',
@@ -56,20 +73,32 @@ function SkeletonRow() {
   );
 }
 
-// ===== Page =====
+/** ===================== HELPERS ===================== */
+function joinUrl(...parts: string[]) {
+  return parts
+    .map((p, i) => (i === 0 ? p.replace(/\/+$/, '') : p.replace(/^\/+/, '')))
+    .join('/');
+}
+
+async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`);
+  }
+  return res.json();
+}
+
+/** ===================== PAGE ===================== */
 export default function AdminUsersPage() {
-  const { isAuthenticated, user, accessToken } = useAuth() as {
-    isAuthenticated: boolean;
-    accessToken: string | null;
-    user?: { username?: string; is_superuser?: boolean } | null;
-  };
+  const { isAuthenticated, user, accessToken } = useAuth() as AuthCtx;
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [count, setCount] = useState<number | null>(null);
 
-  // filters
+  // filters / paging
   const [q, setQ] = useState('');
   const [onlyTeachers, setOnlyTeachers] = useState(false);
   const [page, setPage] = useState(1);
@@ -85,15 +114,20 @@ export default function AdminUsersPage() {
       return;
     }
 
-    async function load() {
+    (async () => {
       setLoading(true);
       setError(null);
       try {
-        const headers: HeadersInit = { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' };
-        // Спершу пробуємо адмінський ендпоінт з пагінацією
-        const url = new URL(`${API_BASE}/admin_panel/api/users/all/`);
+        const headers: HeadersInit = {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        };
+
+        // 1) Пробуем админский эндпойнт с пагинацией
+        const url = new URL(joinUrl(API_BASE, 'admin_panel/api/users/all/'));
         url.searchParams.set('page', String(page));
         url.searchParams.set('page_size', String(pageSize));
+
         const res = await fetch(url.toString(), { headers, cache: 'no-store' });
 
         if (res.ok) {
@@ -104,35 +138,38 @@ export default function AdminUsersPage() {
             setCount(typeof raw?.count === 'number' ? raw.count : list.length);
           }
         } else {
-          // fallback: звичайний список без пагінації
-          const res2 = await fetch(`${API_BASE}/api/users/`, { headers, cache: 'no-store' });
-          if (res2.ok) {
-            const raw = await res2.json();
-            const list: User[] = Array.isArray(raw) ? raw : raw.results || [];
-            if (!cancelled) {
-              setUsers(list);
-              setCount(list.length);
-            }
-          } else {
-            throw new Error(`HTTP ${res.status}`);
+          // 2) Fallback: публичный список без пагинации
+          const fallbackUrl = joinUrl(API_BASE, 'api/users/');
+          const raw = await fetchJSON<unknown>(fallbackUrl, { headers, cache: 'no-store' });
+          const list: User[] = Array.isArray(raw) ? raw : (raw as any)?.results || [];
+          if (!cancelled) {
+            setUsers(list);
+            setCount(list.length);
           }
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Не вдалося завантажити користувачів');
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Не вдалося завантажити користувачів');
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
+    })();
 
-    load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [accessToken, notLoggedIn, notAdmin, page]);
 
   const filtered = useMemo(() => {
     const ql = q.trim().toLowerCase();
     let list = users;
-    if (ql) list = list.filter(u => (u.username || '').toLowerCase().includes(ql) || (u.email || '').toLowerCase().includes(ql));
-    if (onlyTeachers) list = list.filter(u => !!u.is_teacher);
+    if (ql) {
+      list = list.filter(
+        (u) =>
+          (u.username || '').toLowerCase().includes(ql) ||
+          (u.email || '').toLowerCase().includes(ql),
+      );
+    }
+    if (onlyTeachers) list = list.filter((u) => !!u.is_teacher);
     return list;
   }, [users, q, onlyTeachers]);
 
@@ -141,26 +178,28 @@ export default function AdminUsersPage() {
     return Math.max(1, Math.ceil(c / pageSize));
   }, [count, filtered.length]);
 
+  /** ===== Guards ===== */
   if (notLoggedIn) {
     return (
       <main className="min-h-screen grid place-items-center">
-        <Card><h1>Потрібен вхід</h1></Card>
+        <Card><h1 className="text-lg font-bold text-[#0F2E64]">Потрібен вхід</h1></Card>
       </main>
     );
   }
-
   if (notAdmin) {
     return (
       <main className="min-h-screen grid place-items-center">
-        <Card><h1>Тільки для адмінів</h1></Card>
+        <Card><h1 className="text-lg font-bold text-[#0F2E64]">Тільки для адмінів</h1></Card>
       </main>
     );
   }
 
+  /** ===== Page ===== */
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
       <section className="w-[1280px] max-w-[95vw] mx-auto pt-[120px] pb-16">
         <Card>
+          {/* Header */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-[#0F2E64]">Користувачі</h1>
@@ -169,17 +208,28 @@ export default function AdminUsersPage() {
             <div className="flex gap-2 items-center">
               <input
                 value={q}
-                onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Пошук за ім'ям або email"
                 className="h-10 px-3 rounded-lg ring-1 ring-[#E5ECFF] focus:outline-none"
               />
               <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" checked={onlyTeachers} onChange={(e) => { setOnlyTeachers(e.target.checked); setPage(1); }} />
+                <input
+                  type="checkbox"
+                  checked={onlyTeachers}
+                  onChange={(e) => {
+                    setOnlyTeachers(e.target.checked);
+                    setPage(1);
+                  }}
+                />
                 Лише викладачі
               </label>
             </div>
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto mt-5">
             <table className="w-full text-sm">
               <thead>
@@ -223,12 +273,18 @@ export default function AdminUsersPage() {
                           <Badge tone="amber">Очікує підтвердження</Badge>
                         )}
                       </td>
-                      <td className="py-3 text-slate-500">{u.date_joined ? new Date(u.date_joined).toLocaleDateString('uk-UA') : '—'}</td>
+                      <td className="py-3 text-slate-500">
+                        {u.date_joined
+                          ? new Date(u.date_joined).toLocaleDateString('uk-UA')
+                          : '—'}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">Нічого не знайдено</td>
+                    <td colSpan={6} className="py-6 text-center text-slate-500">
+                      Нічого не знайдено
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -237,31 +293,35 @@ export default function AdminUsersPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between mt-5">
-            <div className="text-xs text-slate-500">
-              Всього: {count ?? filtered.length}
-            </div>
+            <div className="text-xs text-slate-500">Всього: {count ?? filtered.length}</div>
             <div className="flex gap-2">
               <button
                 className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >Назад</button>
-              <div className="px-2 py-1 text-sm text-slate-600">{page} / {totalPages}</div>
+              >
+                Назад
+              </button>
+              <div className="px-2 py-1 text-sm text-slate-600">
+                {page} / {totalPages}
+              </div>
               <button
                 className="px-3 py-1.5 rounded-lg ring-1 ring-[#E5ECFF] disabled:opacity-50"
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-              >Далі</button>
+              >
+                Далі
+              </button>
             </div>
           </div>
 
           <div className="mt-6">
-            <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">← Повернутись назад</Link>
+            <Link href="/admin" className="text-[#1345DE] hover:underline text-sm">
+              ← Повернутись назад
+            </Link>
           </div>
 
-          {error ? (
-            <div className="mt-4 text-red-600 text-sm">{error}</div>
-          ) : null}
+          {error ? <div className="mt-4 text-red-600 text-sm">{error}</div> : null}
         </Card>
       </section>
     </main>

@@ -41,10 +41,6 @@ function useIsMdUp() {
   return vw >= 768;
 }
 
-import { ChevronDown, BookOpen, CheckSquare, Users, Award ,BarChart, Youtube, MonitorCheck, Search, Target, Mail, Puzzle, Megaphone, Lightbulb } from "lucide-react";
-import { FaFacebookF, FaYoutube, FaTelegramPlane, FaInstagram, FaTiktok } from "react-icons/fa";
-import FooterCard from '@/components/FooterCard';
-
 /** ===================== animations ===================== */
 const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
@@ -822,9 +818,6 @@ function InstallmentSection() {
 function BookingSection() {
   const API_URL =
     process.env.NEXT_PUBLIC_CONTACTS_API || "https://brainboost.pp.ua/api/api/contacts/";
-    process.env.NEXT_PUBLIC_CONTACTS_API ||
-    "http://127.0.0.1:8000/api/contacts/";
-
 
   const [form, setForm] = React.useState({ name: "", email: "", phone: "" });
   const [loading, setLoading] = React.useState(false);

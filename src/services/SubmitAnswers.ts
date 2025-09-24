@@ -12,7 +12,7 @@ export const submitAnswers = async (
   answers: AnswerData[]
 ) => {
   try {
-    const response = await axios.post('http://127.0.0.1:8000/api/tests/submit-answers/', {
+    const response = await axios.post('https://brainboost.pp.ua/api/api/tests/submit-answers/', {
       user_identifier,
       answers
     });

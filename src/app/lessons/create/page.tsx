@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import Link from 'next/link';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://brainboost.pp.ua/api/';
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (

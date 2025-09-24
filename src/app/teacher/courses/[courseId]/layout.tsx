@@ -5,9 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
-import { GraduationCap } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 type CourseMeta = {
   id: number;
@@ -220,14 +219,6 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
 
             {/* Quick actions */}
             <div className="flex flex-wrap gap-2">
-              <Link
-              href="/teacher"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition text-[#0F2E64]"
-              title="Teacher Hub"
-            >
-              <GraduationCap className="w-4 h-4" />
-              Teacher Hub
-            </Link>
               <Link
                 href={`/teacher/courses/${courseId}/builder/program`}
                 className="px-3 py-2 rounded-xl ring-1 ring-blue-100 bg-white hover:ring-blue-400 text-sm transition"

@@ -864,7 +864,7 @@ function InstallmentSection() {
 
 /* ================= 11) CTA FORM ================= */
 function CTASection() {
-  const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'http://127.0.0.1:8000/api/contacts/';
+  const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'https://brainboost.pp.ua/api/api/contacts/';
   const [form, setForm] = React.useState({ name: '', email: '', phone: '' });
   const [loading, setLoading] = React.useState(false);
   const [status, setStatus] = React.useState<{ type: 'success' | 'error'; message: string } | null>(null);

@@ -20,7 +20,6 @@ type Course = {
   topic?: string;
   price?: number | string | null;
   rating?: number | string | null;
-  is_purchased?: boolean;
 };
 
 type Me = { id: number; username: string; is_superuser: boolean; is_teacher: boolean };
@@ -198,35 +197,6 @@ export default function CourseDetailPage() {
   async function removeComment(slug: string, id: number) {
     await http.delete(`/courses/${encodeURIComponent(slug)}/comments/${id}/`);
   }
-
-  const [isPurchased, setIsPurchased] = useState(false);
-  const [purchasing, setPurchasing] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  async function enrollCourse() {
-    if (!course) return;
-    if (!me) return alert('Щоб додати курс — увійдіть у профіль.');
-    try {
-      setPurchasing(true);
-      const res = await http.post(`/courses/${course.id}/enroll/`);
-      if (res?.data?.is_active) {
-        setIsPurchased(true);
-        setNotice('Курс додано до ваших курсів!');
-        setTimeout(() => setNotice(null), 3000);
-      }
-    } catch (e: any) {
-      alert(e?.response?.data?.detail || 'Не вдалося додати курс');
-    } finally {
-      setPurchasing(false);
-    }
-  }
-
-  useEffect(() => {
-    if (course) {
-      setIsPurchased(!!course.is_purchased);
-    }
-  }, [course]);
-
 
   /* ===================== INIT ===================== */
   useEffect(() => {
@@ -453,21 +423,7 @@ export default function CourseDetailPage() {
                 <div><span>Рейтинг</span><b>{r.toFixed(1)} / 5</b></div>
                 <div><span>Ціна</span><b>{priceLabel}</b></div>
               </div>
-
-              {/* Кнопка додати в куплені курси */}
-              <button
-                className="btnPrimary block"
-                onClick={enrollCourse}
-                disabled={isPurchased || purchasing}
-                style={{ marginTop: '16px' }}
-              >
-                {purchasing ? 'Обробка…' : isPurchased ? 'Курс у вас' : 'Додати в мої курси'}
-              </button>
             </section>
-
-            {notice && (
-              <div className="notice">{notice}</div>
-            )}
 
             {/* Що вивчите */}
             <section className="glass section">
@@ -823,19 +779,6 @@ export default function CourseDetailPage() {
           .wrap{padding-bottom:140px}
           .badges .pill:nth-child(n+4){display:none} /* ховаємо зайві бейджі на дуже вузьких екранах */
         }
-        .notice {
-          margin-top: 12px;
-          padding: 12px 16px;
-          background: #1345de;
-          color: #fff;
-          border-radius: 12px;
-          font-weight: 700;
-          text-align: center;
-          animation: fadein 0.3s, fadeout 0.3s 2.7s;
-        }
-
-        @keyframes fadein { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeout { from { opacity: 1; } to { opacity: 0; } }
       `}</style>
     </>
   );

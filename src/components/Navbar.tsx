@@ -85,7 +85,11 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
 
         {/* Правий блок (desktop) */}
         <div className="row-start-1 col-start-3 hidden md:flex shrink-0 justify-self-end items-center gap-5 lg:gap-7">
-          
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            <button className="text-[#1345DE]">UA</button>
+            <span className="text-slate-400">/</span>
+            <button className="hover:text-[#1345DE]">ENG</button>
+          </div>
 
           {!isAuthenticated ? (
             <Link
@@ -173,7 +177,11 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            
+            <div className="flex items-center gap-2 text-[15px] font-semibold">
+              <button className="text-[#1345DE]">UA</button>
+              <span className="text-slate-400">/</span>
+              <button className="hover:text-[#1345DE]">ENG</button>
+            </div>
 
             {!isAuthenticated ? (
               <Link

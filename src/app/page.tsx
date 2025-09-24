@@ -617,7 +617,7 @@ function StoriesRibbon({ y, x }: { y: number; x: number }) {
 
     (async () => {
       try {
-        const res = await fetch('http://127.0.0.1:8000/api/stories/?limit=6');
+        const res = await fetch('https://brainboost.pp.ua/api/api/stories/?limit=6');
         const data = await res.json();
         const raw = Array.isArray(data?.results) ? data.results : Array.isArray(data) ? data : [];
         const normalized: StoryItem[] = raw.map((s: any) => ({
@@ -860,7 +860,7 @@ function PickCourseCTA() {
     }
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/contacts/', {
+      const res = await fetch('https://brainboost.pp.ua/api/api/contacts/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

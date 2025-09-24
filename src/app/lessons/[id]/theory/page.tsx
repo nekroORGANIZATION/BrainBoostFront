@@ -23,7 +23,7 @@ export default function TheoryPage() {
     if (!id) return;
 
     axios
-      .get(`http://127.0.0.1:8000/api/lesson/lesson/theories/${id}/`, { headers })
+      .get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers })
       .then((res) => {
         if (res.data.length > 0) {
           setContent(res.data[0].theory_text);
@@ -43,14 +43,14 @@ export default function TheoryPage() {
     try {
       if (theoryId) {
         const res = await axios.put(
-          `http://127.0.0.1:8000/api/lesson/lesson/theories/${id}/${theoryId}/`,
+          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/${theoryId}/`,
           { theory_text: html },
           { headers }
         );
         setContent(res.data.theory_text);
       } else {
         const res = await axios.post(
-          `http://127.0.0.1:8000/api/lesson/lesson/theories/${id}/`,
+          `https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`,
           { theory_text: html },
           { headers }
         );
@@ -114,7 +114,7 @@ export default function TheoryPage() {
 
                 try {
                   const res = await axios.post(
-                    'http://127.0.0.1:8000/api/ai/ask/',
+                    'https://brainboost.pp.ua/api/api/ai/ask/',
                     { lesson_id: id, question: userInput },
                     { headers: { ...headers, 'Content-Type': 'application/json' } }
                   );

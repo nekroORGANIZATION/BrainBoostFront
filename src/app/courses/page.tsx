@@ -240,21 +240,19 @@ function Toolbar({
 /* =========================================
    Section: AIStrip (grid 4-per-row)
 ========================================= */
-/* =========================================
-   Section: AIStrip — STATIC FLAGSHIP CARDS
-   (показує FEATURED, без AI логіки)
-========================================= */
 function AIStrip({
-  show, setShow,
+  show, setShow, items, getLangLabel,
 }: {
   show: boolean; setShow: (v:(p:boolean)=>boolean)=>void;
+  items: Course[]; getLangLabel: (c: Course)=>string;
 }) {
   return (
     <div className="aiWrap aiWrap--roomy">
       <div className="aiRow">
-        <span className="aiBadge">★</span>
+        <span className="aiBadge">AI</span>
         <div className="aiText">
-          <strong>Рекомендації від ШІ*</strong>
+          <strong>Рекомендації від ШІ</strong>
+          <span className="muted"> — персональна вибірка за вашими вподобаннями</span>
         </div>
         <button className="aiBtn" onClick={()=>setShow(v=>!v)} aria-expanded={show}>
           {show ? 'Сховати' : 'Показати'}
@@ -263,24 +261,40 @@ function AIStrip({
 
       {show && (
         <div className="gridWrap">
-          <ul className="cards heroGrid" aria-label="Флагманські курси">
-            {FEATURED.map(f => (
-              <li key={`flag-${f.href}`} className="card card--hero">
-                <Link href={f.href} className="cardLink" prefetch={false}>
-                  <div className="imgBox imgBox--hero">
-                    {f.image && <img src={f.image} alt={f.title} loading="lazy" />}
+          <ul className="cards cards--wrap" aria-label="Рекомендовані курси">
+            {items.map((c)=>(
+              <li key={`rec-${c.id}`} className="card card--elevated" data-track="ai-reco">
+                <div className="media">
+                  {c.image ? <img src={String(c.image)} alt={c.title} loading="lazy" /> : <div className="ph">Без зображення</div>}
+                  <div className="topBadges" aria-hidden>
+                    <span className="priceBadge">
+                      {c.price && Number(c.price) > 0 ? `${Number(c.price)} грн` : 'Безкоштовно'}
+                    </span>
+                    <span className="aiPick">AI pick</span>
                   </div>
-                  <div className="cardBody">
-                    <div className="textCol">
-                      <h3 className="cardTitle">{f.title}</h3>
-                      <p className="cardDesc">{f.desc}</p>
-                    </div>
-                    <div className="footerRow">
-                      <span className="chip chipSoft">Топ вибір</span>
+                  <span className="ratePill">★ {Number(c.rating ?? 0).toFixed(1)}</span>
+                </div>
+
+                <div className="body">
+                  <div className="text">
+                    <h3 className="title" title={c.title}>{c.title}</h3>
+                    <p className="subtitle">
+                      {c.description?.slice(0, 120)}
+                      {c.description && c.description.length > 120 ? '…' : ''}
+                    </p>
+                  </div>
+
+                  <div className="metaRow">
+                    <span className="langPill">
+                      <span className="dot" aria-hidden />
+                      {getLangLabel(c)}
+                    </span>
+
+                    <Link href={`/courses/${c.id}/details`} className="noUnderline">
                       <span className="btnPrimary">Деталі</span>
-                    </div>
+                    </Link>
                   </div>
-                </Link>
+                </div>
               </li>
             ))}
           </ul>
@@ -300,32 +314,47 @@ function AIStrip({
         .aiBtn:hover{ transform:translateY(-1px); filter:saturate(1.05); }
 
         .gridWrap{ margin-top:12px; }
+        .cards{ list-style:none; padding:0; margin:0; display:grid; gap:16px; }
+        .cards--wrap{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-        /* стилі карток як у FeaturedHero, але локально для цієї секції */
-        .heroGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; list-style: none; padding: 0; margin: 0; }
-        .card { position: relative; background: linear-gradient(180deg, #ffffff, #f9fbff); border-radius: 16px; border: 1px solid rgba(2, 28, 78, 0.1); overflow: hidden; display: flex; flex-direction: column; transition: transform 0.18s ease, box-shadow 0.22s ease, border-color 0.2s ease, filter 0.2s ease; box-shadow: 0 2px 6px rgba(2, 28, 78, 0.06), 0 10px 24px rgba(2, 28, 78, 0.11), 0 24px 48px rgba(2, 28, 78, 0.10), inset 0 0 0 1px rgba(19, 69, 222, 0.05); }
-        .card:hover { transform: translateY(-6px); border-color: rgba(19, 69, 222, 0.22); filter: saturate(1.02); box-shadow: 0 4px 10px rgba(2, 28, 78, 0.08), 0 16px 36px rgba(2, 28, 78, 0.14), 0 34px 68px rgba(2, 28, 78, 0.16), 0 0 0 8px rgba(19, 69, 222, 0.06); }
-        .cardLink { display: block; color: inherit; text-decoration: none; }
-        .imgBox { height: 188px; background: #eef2ff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
-        .imgBox::after{ content:""; position:absolute; inset:0; background: linear-gradient(180deg, rgba(19,69,222,.06), transparent 35%); pointer-events:none; }
-        .imgBox img { width: 100%; height: 100%; object-fit: cover; }
-        .cardBody { padding: 16px; flex: 1; display: grid; grid-template-rows: 1fr auto; gap: 12px; }
-        .textCol { min-height: 0; }
-        .cardTitle { font-size: 20px; font-weight: 800; color: #0f172a; margin: 0 0 6px; letter-spacing: .1px; }
-        .cardDesc { font-size: 14px; color: #475569; line-height: 1.55; margin: 0; }
-        .footerRow{ display:flex; align-items:center; justify-content:space-between; gap: 10px; margin-top: 4px; }
-        .chip{ display:inline-flex; align-items:center; gap:8px; padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid #dbe6ff; }
-        .chipSoft{ background:#eef3ff; color:#1345de; }
-        .btnPrimary { display: inline-flex; align-items:center; justify-content:center; padding: 9px 14px; border-radius: 12px; font-size: 14px; font-weight: 800; text-decoration: none; color: #fff; background: linear-gradient(45deg, #1345de, #2563eb); box-shadow: 0 2px 6px rgba(19, 69, 222, 0.25), 0 8px 22px rgba(19, 69, 222, 0.28); transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; cursor: pointer; }
-        .btnPrimary:hover { transform: translateY(-1px); background: linear-gradient(45deg, #0f36ba, #1e40af); box-shadow: 0 3px 8px rgba(19, 69, 222, 0.3), 0 12px 28px rgba(19, 69, 222, 0.35); filter: saturate(1.05); }
+        .card{ position:relative; display:grid; grid-template-rows:60% 40%; min-height:360px; background:linear-gradient(180deg, white, #f8faff);
+          border-radius:18px; border:1px solid rgba(0,0,0,.06); box-shadow:0 3px 8px rgba(0,0,0,.07), 0 14px 30px rgba(0,0,0,.12), inset 0 0 0 1px rgba(19,69,222,.05);
+          transition:transform .2s ease, box-shadow .25s ease, border-color .2s ease; overflow:hidden; }
+        .card--elevated:hover{ transform:translateY(-6px); border-color:rgba(19,69,222,.25); box-shadow:0 8px 16px rgba(0,0,0,.10), 0 26px 52px rgba(0,0,0,.18), 0 0 0 10px rgba(19,69,222,.10); }
 
-        @media (max-width: 1100px){ .heroGrid{ grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 720px){ .heroGrid{ grid-template-columns: 1fr; } }
+        .media{ position:relative; width:100%; height:100%; overflow:hidden; border-top-left-radius:18px; border-top-right-radius:18px; }
+        .media img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+        .ph{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background: lightsteelblue; color: slategray; }
+
+        .topBadges{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; gap:8px; z-index:2; }
+        .priceBadge{ display:inline-flex; align-items:center; justify-content:center; padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; color: navy; background: aliceblue; border:1px solid lightsteelblue; box-shadow:0 6px 14px rgba(70,130,180,.28); }
+        .aiPick{ padding:6px 10px; border-radius:999px; font-size:12px; font-weight:900; color: purple; background: lavender; border:1px solid thistle; box-shadow:0 6px 14px rgba(128,0,128,.20); }
+        .ratePill{ position:absolute; bottom:10px; left:50%; transform:translateX(-50%); background:black; color:white; font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px; box-shadow:0 12px 24px rgba(0,0,0,.28); z-index:2; }
+
+        .body{ display:grid; grid-template-rows:auto 1fr auto; row-gap:10px; min-height:0; padding:14px 16px 16px;
+          background: radial-gradient(120px 100px at 40% 0%, rgba(219,192,255,.55), transparent 80%), radial-gradient(160px 80px at 95% 0%, rgba(210,173,255,.50), transparent 60%), linear-gradient(180deg, white, #dcd2ff 60%, #ddd0ff);
+          border-top:1px solid #e8c5ff; }
+        .text{ min-height:0; display:grid; gap:6px; }
+        .title{ margin:0; font-size:18px; font-weight:900; line-height:1.25; color:#0f172a; letter-spacing:.1px; }
+        .subtitle{ margin:0; font-size:14px; line-height:1.55; color:#475569; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+        .metaRow{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .langPill{ display:inline-flex; align-items:center; gap:8px; padding:9px 12px; border-radius:999px; background: aliceblue; border:1px solid lightsteelblue; color: navy; font-weight:800; font-size:12px; box-shadow:0 6px 14px rgba(70,130,180,.12); }
+        .langPill .dot{ width:8px; height:8px; border-radius:999px; background: dodgerblue; box-shadow:0 0 0 4px lightsteelblue; }
+
+        .noUnderline{ text-decoration:none; }
+        .btnPrimary{ display:inline-flex; align-items:center; justify-content:center; padding:12px 18px; border-radius:14px; font-weight:900; font-size:14px; line-height:1; white-space:nowrap; color:white; background: linear-gradient(45deg, royalblue, blue); box-shadow: 0 10px 22px rgba(0,0,255,.28), 0 2px 0 navy, inset 0 0 0 1px lightblue; transition: transform .15s ease, box-shadow .2s ease, filter .2s ease; user-select:none; }
+        .btnPrimary:hover{ transform: translateY(-1px); box-shadow: 0 14px 28px rgba(0,0,255,.33), 0 4px 0 navy, inset 0 0 0 1px lightblue; filter: saturate(1.05); }
+        .btnPrimary:active{ transform: translateY(0); box-shadow: 0 8px 16px rgba(0,0,255,.26), 0 1px 0 navy, inset 0 0 0 1px lightblue; }
+
+        @media (max-width: 1100px){ .cards--wrap{ grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+        @media (max-width: 820px){ .cards--wrap{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 520px){ .cards--wrap{ grid-template-columns: 1fr; } }
+        @media (prefers-reduced-motion: reduce){ .card, .btnPrimary, .aiBtn{ transition:none; } }
       `}</style>
     </div>
   );
 }
-
 
 /* =========================================
    Section: ChipsRow (active filters)
@@ -1081,11 +1110,7 @@ export default function CoursesPage() {
           onlyNew={onlyNew} setOnlyNew={(b)=>{ setOnlyNew(b); if (b) setSortBy('-created_at'); }}
         />
 
-        <AIStrip
-  show={showRecommendations}
-  setShow={setShowRecommendations}
-/>
-
+        <AIStrip show={showRecommendations} setShow={setShowRecommendations} items={recommended} getLangLabel={(c)=>extractLanguageLabel(c.language)} />
 
         <TwoColumn
           filtersOpen={filtersOpen}

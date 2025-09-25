@@ -1,10 +1,10 @@
 // src/lib/http.ts
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
-export const API_BASE = 'http://172.17.10.23:8000/api';
+export const API_BASE = 'http://172.17.10.23:8000';
 
 // ← звір ці шляхи з бекендом і поправ, якщо інші:
-export const LOGIN_URL    = '/accounts/api/login/';
+export const LOGIN_URL    = '/api/accounts/api/login/';
 export const REGISTER_URL = '/accounts/api/register/';
 export const ME_URL       = '/accounts/api/profile/';
 export const REFRESH_URL  = '/accounts/api/token/refresh/';

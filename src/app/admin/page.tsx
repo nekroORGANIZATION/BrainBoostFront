@@ -1,12 +1,12 @@
 'use client';
-//
+
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Users, GraduationCap, UserCheck, ShieldCheck, LinkIcon, Clock, BookOpenText } from 'lucide-react';
 
 /** ===================== CONFIG ===================== */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api/';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
 
 /** ===================== TYPES ===================== */
 type Course = {

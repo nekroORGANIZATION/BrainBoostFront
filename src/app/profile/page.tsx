@@ -2,14 +2,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import http, { ME_URL } from '@/lib/http';
+import http, { ME_URL, setAuthHeader } from '@/lib/http';
 import { useAuth } from '@/context/AuthContext';
 import { mediaUrl } from '@/lib/media';
 import { motion, AnimatePresence, type Variants, type Transition } from 'framer-motion';
-import {
-  PencilLine, Check, X, Upload, Crown, ShieldCheck,
-  GraduationCap, BookOpen, LogIn, Star
-} from 'lucide-react';
+import { PencilLine, Check, X, Upload, Crown, ShieldCheck, GraduationCap, BookOpen, LogIn, Star } from 'lucide-react';
 
 /* =========================
    Типи
@@ -41,8 +38,8 @@ type Course = {
 /* =========================
    Константи API
 ========================= */
-const PURCHASED_URL_PRIMARY = '/courses/me/purchased/';
-const PURCHASED_URL_FALLBACK = '/api/courses/me/purchased/';
+const PURCHASED_URL_PRIMARY = '/courses/me/purchased/';   // DRF (root)
+const PURCHASED_URL_FALLBACK = '/api/courses/me/purchased/'; // DRF під /api
 
 /* =========================
    Анімаційні варіанти
@@ -86,6 +83,11 @@ export default function ProfilePage() {
     profile_picture: null as File | null,
   });
 
+  /* важливо: навішуємо токен в axios відразу після появи */
+  useEffect(() => {
+    if (accessToken) setAuthHeader(accessToken);
+  }, [accessToken]);
+
   useEffect(() => {
     // 1) чекаємо ініціалізацію контексту (undefined)
     if (typeof accessToken === 'undefined') return;
@@ -99,14 +101,13 @@ export default function ProfilePage() {
     }
 
     const controller = new AbortController();
-    const headers = { Authorization: `Bearer ${accessToken}` };
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
         // Профіль
-        const p = await http.get(ME_URL, { headers, signal: controller.signal as any });
+        const p = await http.get(ME_URL, { signal: controller.signal as any });
         const prof: ProfileData = p.data;
         setProfile(prof);
         setFormData({
@@ -118,13 +119,13 @@ export default function ProfilePage() {
           profile_picture: null,
         });
 
-        // Придбані курси (з fallback на /api/)
+        // Придбані курси — спочатку пробуємо основний url, далі fallback
         let pc;
         try {
-          pc = await http.get(PURCHASED_URL_PRIMARY, { headers, signal: controller.signal as any });
+          pc = await http.get(PURCHASED_URL_PRIMARY, { signal: controller.signal as any });
         } catch (e: any) {
           if (e?.response?.status === 404) {
-            pc = await http.get(PURCHASED_URL_FALLBACK, { headers, signal: controller.signal as any });
+            pc = await http.get(PURCHASED_URL_FALLBACK, { signal: controller.signal as any });
           } else {
             throw e;
           }
@@ -135,6 +136,7 @@ export default function ProfilePage() {
           : pc.data?.results || pc.data?.data || pc.data?.items || [];
 
         const mapped: Course[] = rawList.map((row: any) => {
+          // підтримка PurchasedCourse: { user, course, ... }
           const c = row?.course ?? row;
           return {
             id: c?.id,
@@ -147,9 +149,15 @@ export default function ProfilePage() {
             author: typeof c?.author === 'object' ? c.author?.id : c?.author,
           };
         });
+
         setCourses(mapped);
       } catch (e: any) {
-        // мʼяке повідомлення для 401/403
+        // ІГНОРУЄМО abort від axios (інакше бачили "canceled")
+        if (e?.message === 'canceled' || e?.code === 'ERR_CANCELED') {
+          return;
+        }
+
+        // 401/403 — акуратне повідомлення
         const status = e?.response?.status;
         if (status === 401 || status === 403) {
           setError('Сеанс недійсний або закінчився. Увійдіть знову.');
@@ -158,8 +166,12 @@ export default function ProfilePage() {
         } else {
           const msg =
             status
-              ? `${status}: ${typeof e.response.data === 'string' ? e.response.data : 'Помилка завантаження'}`
-              : (e?.message || 'Не вдалося завантажити дані профілю.');
+              ? `${status}: ${
+                  typeof e?.response?.data === 'string'
+                    ? e.response.data
+                    : 'Помилка завантаження'
+                }`
+              : e?.message || 'Не вдалося завантажити дані профілю.';
           setError(msg);
         }
       } finally {
@@ -200,12 +212,22 @@ export default function ProfilePage() {
 
     try {
       const res = await http.patch(ME_URL, data, {
-        headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${accessToken}` },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setProfile(res.data);
       setEditMode(false);
     } catch (e: any) {
-      setError(e?.response?.data ? JSON.stringify(e.response.data) : 'Не вдалося оновити профіль.');
+      if (e?.message === 'canceled' || e?.code === 'ERR_CANCELED') {
+        // ігноруємо аборт
+      } else {
+        setError(
+          e?.response?.data
+            ? typeof e.response.data === 'string'
+              ? e.response.data
+              : JSON.stringify(e.response.data)
+            : 'Не вдалося оновити профіль.',
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -257,19 +279,26 @@ export default function ProfilePage() {
 
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
-      <div className="p-6 max-w-[1100px] mx-auto">
-        {/* HEADER */}
-        <motion.div variants={fadeUp} initial="hidden" animate="show" className="rounded-3xl bg-gradient-to-br from-indigo-50 to-sky-50 ring-1 ring-slate-200/60 p-6 md:p-8 shadow-[0_10px_30px_rgba(2,28,78,0.06)] mb-6">
+      {/* напівпрозорий градієнт зверху для читабельності */}
+      <div className="pointer-events-none fixed inset-0 bg-gradient-to-b from-white/70 via-white/30 to-transparent" />
+      <div className="p-6 max-w-[1100px] mx-auto relative">
+        {/* HERO */}
+        <motion.div
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className="rounded-3xl bg-white/80 backdrop-blur-xl ring-1 ring-[#E5ECFF] p-6 md:p-8 shadow-[0_18px_50px_rgba(2,28,78,0.10)] mb-6"
+        >
           <div className="flex flex-wrap items-center gap-4 justify-between">
             <div>
-              <h1 className="text-[26px] font-semibold text-[#021C4E]">Твій профіль на BrainBoost</h1>
-              <p className="text-slate-600 mt-1">Керуй обліковими даними та навчанням</p>
+              <h1 className="text-[26px] md:text-[32px] font-extrabold text-[#021C4E]">Твій профіль</h1>
+              <p className="text-slate-600 mt-1">Керуй даними облікового запису й навчанням</p>
             </div>
             <div className="flex items-center gap-2">
               {!editMode ? (
                 <button
                   onClick={() => setEditMode(true)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 text-white px-4 py-2 hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#1345DE] text-white px-4 py-2 hover:brightness-110 focus:outline-none focus:ring-4 focus:ring-indigo-200"
                 >
                   <PencilLine className="h-4 w-4" /> Редагувати
                 </button>
@@ -294,22 +323,34 @@ export default function ProfilePage() {
           </div>
         </motion.div>
 
-        {/* CONTENT CARD */}
-        <div className="rounded-3xl bg-white/90 backdrop-blur-md ring-1 ring-slate-200/70 shadow-[0_12px_40px_rgba(2,28,78,0.06)] p-6 space-y-8">
+        {/* CARD */}
+        <div className="rounded-3xl bg-white/90 backdrop-blur-xl ring-1 ring-[#E5ECFF] shadow-[0_18px_50px_rgba(2,28,78,0.08)] p-6 space-y-8">
           {loading && <ProfileSkeleton />}
 
           {error && (
-            <motion.div variants={fadeUp} initial="hidden" animate="show" className="rounded-xl bg-red-50 ring-1 ring-red-200 text-red-700 p-3 text-center">
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              className="rounded-xl bg-red-50 ring-1 ring-red-200 text-red-700 p-3 text-center"
+            >
               {error}{' '}
-              <Link href="/login" className="underline font-semibold">Увійти знову</Link>
+              <Link href="/login" className="underline font-semibold">
+                Увійти знову
+              </Link>
             </motion.div>
           )}
 
           {profile && !loading && (
             <>
               {/* Профіль */}
-              <motion.section variants={fadeUp} initial="hidden" animate="show" className="flex flex-col md:flex-row items-start gap-6">
-                <motion.div whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="relative">
+              <motion.section
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                className="flex flex-col md:flex-row items-start gap-6"
+              >
+                <div className="relative">
                   <div className="p-1 rounded-full bg-gradient-to-br from-indigo-500 to-sky-400">
                     <img
                       src={profile.profile_picture ? mediaUrl(profile.profile_picture) : '/default-avatar.png'}
@@ -322,12 +363,18 @@ export default function ProfilePage() {
                       Teacher
                     </span>
                   )}
-                </motion.div>
+                </div>
 
                 <div className="flex-1 min-w-0">
                   <AnimatePresence initial={false} mode="wait">
                     {!editMode ? (
-                      <motion.div key="view" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
+                      <motion.div
+                        key="view"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25 }}
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
                           <InfoRow label="Нікнейм" value={profile.username} />
                           <InfoRow label="Email" value={profile.email} />
@@ -337,8 +384,11 @@ export default function ProfilePage() {
                           <InfoRow
                             label="Роль"
                             value={
-                              profile.is_superuser ? 'Адміністратор' :
-                              profile.is_teacher ? 'Викладач' : 'Студент'
+                              profile.is_superuser
+                                ? 'Адміністратор'
+                                : profile.is_teacher
+                                ? 'Викладач'
+                                : 'Студент'
                             }
                           />
                         </div>
@@ -362,18 +412,46 @@ export default function ProfilePage() {
                         </div>
                       </motion.div>
                     ) : (
-                      <motion.div key="edit" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <motion.div
+                        key="edit"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.25 }}
+                        className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                      >
                         <Field label="Ім’я користувача">
-                          <input name="username" value={formData.username} onChange={handleTextChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100" />
+                          <input
+                            name="username"
+                            value={formData.username}
+                            onChange={handleTextChange}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100"
+                          />
                         </Field>
                         <Field label="Email">
-                          <input type="email" name="email" value={formData.email} onChange={handleTextChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100" />
+                          <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleTextChange}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100"
+                          />
                         </Field>
                         <Field label="Ім’я">
-                          <input name="first_name" value={formData.first_name} onChange={handleTextChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100" />
+                          <input
+                            name="first_name"
+                            value={formData.first_name}
+                            onChange={handleTextChange}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100"
+                          />
                         </Field>
                         <Field label="Прізвище">
-                          <input name="last_name" value={formData.last_name} onChange={handleTextChange} className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100" />
+                          <input
+                            name="last_name"
+                            value={formData.last_name}
+                            onChange={handleTextChange}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white/80 px-3 py-2 outline-none focus:ring-4 focus:ring-indigo-100"
+                          />
                         </Field>
                         <Field label="Аватар" className="md:col-span-2">
                           <label className="mt-1 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 cursor-pointer hover:bg-slate-50">
@@ -401,7 +479,12 @@ export default function ProfilePage() {
 
               {/* Доступи */}
               {(profile.is_teacher || profile.is_superuser) && (
-                <motion.section variants={fadeUp} initial="hidden" animate="show" className="rounded-2xl bg-indigo-50/60 ring-1 ring-indigo-100 p-6">
+                <motion.section
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate="show"
+                  className="rounded-2xl bg-indigo-50/60 ring-1 ring-indigo-100 p-6"
+                >
                   <h2 className="text-xl font-semibold mb-4 text-[#021C4E]">🔑 Ваші доступи</h2>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <GlassLink href="/student" icon={<BookOpen />} title="Кабінет студента" />
@@ -423,9 +506,14 @@ export default function ProfilePage() {
                 </div>
 
                 {courses.length === 0 ? (
-                  <p className="text-gray-600">Ти ще не придбав жодного курсу. Почни навчання вже сьогодні!</p>
+                  <p className="text-gray-700">Ти ще не придбав жодного курсу. Почни навчання вже сьогодні!</p>
                 ) : (
-                  <motion.ul variants={listStagger} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-6 list-none p-0">
+                  <motion.ul
+                    variants={listStagger}
+                    initial="hidden"
+                    animate="show"
+                    className="grid grid-cols-1 md:grid-cols-2 gap-6 list-none p-0"
+                  >
                     {courses.map((course) => (
                       <motion.li key={course.id} variants={listItem}>
                         <CourseCard course={course} renderStars={renderStars} />
@@ -436,8 +524,15 @@ export default function ProfilePage() {
               </motion.section>
 
               {/* Футер-мотивація */}
-              <motion.div variants={fadeUp} initial="hidden" animate="show" className="rounded-2xl bg-amber-50 ring-1 ring-amber-100 p-6 text-center">
-                <h3 className="text-lg font-semibold text-amber-900">🌟 Підвищуй свої навички разом з BrainBoost!</h3>
+              <motion.div
+                variants={fadeUp}
+                initial="hidden"
+                animate="show"
+                className="rounded-2xl bg-amber-50 ring-1 ring-amber-100 p-6 text-center"
+              >
+                <h3 className="text-lg font-semibold text-amber-900">
+                  🌟 Підвищуй свої навички разом з BrainBoost!
+                </h3>
                 <p className="text-amber-700">Вчися. Розвивайся. Досягай більшого 💡</p>
               </motion.div>
             </>
@@ -460,7 +555,15 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Field({ label, children, className = '' }: { label: string; children: React.ReactNode; className?: string }) {
+function Field({
+  label,
+  children,
+  className = '',
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <label className={`block ${className}`}>
       <span className="block text-sm text-slate-700">{label}</span>
@@ -483,12 +586,25 @@ function Badge({ children, tone = 'indigo' }: { children: React.ReactNode; tone?
   );
 }
 
-function GlassLink({ href, icon, title, primary, dark }: { href: string; icon: React.ReactNode; title: string; primary?: boolean; dark?: boolean }) {
-  const base = 'group rounded-2xl p-5 ring-1 transition shadow-sm flex flex-col items-center text-center backdrop-blur';
+function GlassLink({
+  href,
+  icon,
+  title,
+  primary,
+  dark,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+  primary?: boolean;
+  dark?: boolean;
+}) {
+  const base =
+    'group rounded-2xl p-5 ring-1 transition shadow-sm flex flex-col items-center text-center backdrop-blur';
   const tone = dark
     ? 'bg-slate-900 text-white ring-slate-800 hover:bg-slate-800'
     : primary
-    ? 'bg-indigo-600 text-white ring-indigo-500 hover:bg-indigo-700'
+    ? 'bg-[#1345DE] text-white ring-indigo-500 hover:brightness-110'
     : 'bg-white/70 ring-slate-200 hover:bg-white';
   return (
     <Link href={href} className={`${base} ${tone}`}>
@@ -500,38 +616,64 @@ function GlassLink({ href, icon, title, primary, dark }: { href: string; icon: R
   );
 }
 
-function CourseCard({ course, renderStars }: { course: Course; renderStars: (rating: number | string | null) => React.ReactNode }) {
+function CourseCard({
+  course,
+  renderStars,
+}: {
+  course: Course;
+  renderStars: (rating: number | string | null) => React.ReactNode;
+}) {
   const price = Number(course.price ?? 0);
   const hrefDetails = `/courses/${course.slug ?? course.id}/details`;
   const hrefStudy = `/student/courses/${course.id}`;
 
   return (
-    <motion.div whileHover={{ y: -4, scale: 1.01 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }} className="h-full border border-blue-100 rounded-2xl bg-white shadow-[0_10px_24px_rgba(2,28,78,0.06)] overflow-hidden">
+    <motion.div
+      whileHover={{ y: -4, scale: 1.01 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      className="h-full border border-blue-100 rounded-2xl bg-white shadow-[0_10px_24px_rgba(2,28,78,0.06)] overflow-hidden"
+    >
       {course.image && (
         <div className="h-44 overflow-hidden">
-          <motion.img src={course.image} alt={course.title} className="w-full h-full object-cover" whileHover={{ scale: 1.06 }} transition={{ duration: 0.35 }} />
+          <motion.img
+            src={course.image}
+            alt={course.title}
+            className="w-full h-full object-cover"
+            whileHover={{ scale: 1.06 }}
+            transition={{ duration: 0.35 }}
+          />
         </div>
       )}
 
       <div className="p-5 space-y-3">
         <h3 className="text-lg font-bold text-[#021C4E] line-clamp-2">{course.title}</h3>
         <p className="text-slate-700 min-h-[44px]">
-          {course.description?.length && course.description.length > 140 ? course.description.slice(0, 140) + '…' : course.description || ''}
+          {course.description?.length && course.description.length > 140
+            ? course.description.slice(0, 140) + '…'
+            : course.description || ''}
         </p>
 
         <div className="flex items-center justify-between">
           <div className="text-blue-800 font-semibold">${price.toFixed(2)}</div>
           <div className="text-sm text-slate-700 flex items-center gap-2">
             <Star className="h-4 w-4 text-yellow-500" />
-            <span>{renderStars(course.rating)} ({Number(course.rating ?? 0).toFixed(1)})</span>
+            <span>
+              {renderStars(course.rating)} ({Number(course.rating ?? 0).toFixed(1)})
+            </span>
           </div>
         </div>
 
         <div className="flex gap-2 pt-2">
-          <Link href={hrefDetails} className="flex-1 text-center rounded-xl bg-indigo-50 text-indigo-700 px-4 py-2 hover:bg-indigo-100">
+          <Link
+            href={hrefDetails}
+            className="flex-1 text-center rounded-xl bg-indigo-50 text-indigo-700 px-4 py-2 hover:bg-indigo-100"
+          >
             Деталі курсу
           </Link>
-          <Link href={hrefStudy} className="flex-1 text-center rounded-xl bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700">
+          <Link
+            href={hrefStudy}
+            className="flex-1 text-center rounded-xl bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700"
+          >
             До навчання
           </Link>
         </div>

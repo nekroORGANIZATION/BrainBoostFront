@@ -2,7 +2,7 @@
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
 export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
+  process.env.NEXT_PUBLIC_API_BASE || 'http://172.17.10.23:8000/api';
 
 // ← звір ці шляхи з бекендом і поправ, якщо інші:
 export const LOGIN_URL    = '/accounts/api/login/';

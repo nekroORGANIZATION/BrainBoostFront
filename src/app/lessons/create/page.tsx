@@ -1,5 +1,8 @@
 'use client';
 
+export const dynamic = 'force-dynamic'; // (опционально) выключить SSG для этой страницы
+// или вместо этого можно: export const revalidate = 0;
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -17,7 +20,14 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 
 export default function LessonCreatePage() {
   const router = useRouter();
-  const token = localStorage.getItem('accessToken');
+
+  // ✅ токен читаем только в браузере
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setToken(localStorage.getItem('accessToken'));
+    }
+  }, []);
 
   const [courses, setCourses] = useState<{ id: number; title: string }[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(true);
@@ -37,10 +47,9 @@ export default function LessonCreatePage() {
 
   useEffect(() => {
     if (!token) return;
-
     axios
       .get(`${API_BASE}/courses/`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => { setCourses(res.data.results); setLoadingCourses(false); })
+      .then(res => { setCourses(res.data.results ?? res.data); setLoadingCourses(false); })
       .catch(() => setLoadingCourses(false));
   }, [token]);
 
@@ -55,7 +64,6 @@ export default function LessonCreatePage() {
 
   const handleSubmit = async () => {
     if (!token) return setMessage('Треба увійти в систему');
-
     if (!lesson.title || !lesson.type || !lesson.course) return setMessage('Заповніть назву, тип та курс');
 
     const formData = new FormData();
@@ -68,13 +76,11 @@ export default function LessonCreatePage() {
     formData.append('type', lesson.type);
 
     if (lesson.type === 'TEXT' && lesson.content_text) formData.append('content_text', lesson.content_text);
-    if ((lesson.type === 'VIDEO' || lesson.type === 'LINK') && lesson.content_url)
-      formData.append('content_url', lesson.content_url);
-
+    if ((lesson.type === 'VIDEO' || lesson.type === 'LINK') && lesson.content_url) formData.append('content_url', lesson.content_url);
     if (lesson.cover_image) formData.append('cover_image', lesson.cover_image);
 
     try {
-      const res = await axios.post(`${API_BASE}/api/lesson/lessons/`, formData, {
+      await axios.post(`${API_BASE}/api/lesson/lessons/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
       });
       setMessage('🎉 Урок створено!');
@@ -90,9 +96,7 @@ export default function LessonCreatePage() {
       <Card className="w-full max-w-3xl space-y-6">
         <h2 className="text-3xl font-bold text-[#021C4E]">Створити урок</h2>
 
-        {message && (
-          <div className="p-3 rounded-md bg-green-100 text-green-800 font-semibold">{message}</div>
-        )}
+        {message && <div className="p-3 rounded-md bg-green-100 text-green-800 font-semibold">{message}</div>}
 
         <div className="grid gap-4">
           {/* Курс */}
@@ -108,7 +112,7 @@ export default function LessonCreatePage() {
               >
                 <option value="">-- Оберіть курс --</option>
                 {courses.map(c => (
-                  <option key={c.id} value={c.id}>{c.title}</option>
+                  <option key={c.id} value={String(c.id)}>{c.title}</option>
                 ))}
               </select>
             )}
@@ -135,7 +139,7 @@ export default function LessonCreatePage() {
             />
           </div>
 
-          {/* Тип уроку, статус, тривалість, порядок */}
+          {/* Тип/статус/тривалість/порядок */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block font-semibold mb-1 text-slate-700">Тип уроку</label>
@@ -210,10 +214,16 @@ export default function LessonCreatePage() {
             <label className="block font-semibold mb-1 text-slate-700">Обкладинка</label>
             <div className="flex items-center gap-4">
               <input type="file" onChange={handleCoverChange} className="rounded-[10px] ring-1 ring-[#E5ECFF] px-3 py-2" />
-              {lesson.cover_image && (
+              {lesson.cover_image && typeof window !== 'undefined' && (
                 <div className="flex items-center gap-2">
-                  <img src={URL.createObjectURL(lesson.cover_image)} alt="Preview" className="w-32 h-20 object-cover rounded-md" />
-                  <button onClick={removeCover} className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">Видалити</button>
+                  <img
+                    src={URL.createObjectURL(lesson.cover_image)}
+                    alt="Preview"
+                    className="w-32 h-20 object-cover rounded-md"
+                  />
+                  <button onClick={removeCover} className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600">
+                    Видалити
+                  </button>
                 </div>
               )}
             </div>

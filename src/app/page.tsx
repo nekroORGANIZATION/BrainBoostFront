@@ -66,7 +66,7 @@ export default function HomePage() {
               href="/courses"
               className="mt-4 w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 sm:px-6 sm:py-4 md:px-8 md:py-3 bg-[#1345DE] text-white font-[Mulish] font-semibold text-sm sm:text-base md:text-[14px] rounded-lg text-center"
             >
-              Хочу вчитись в Brainboost
+              Я Хочу вчитись в Brainboost
             </Link>
 
             {/* Аватари та відгуки */}

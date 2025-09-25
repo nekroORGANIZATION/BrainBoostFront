@@ -1,7 +1,7 @@
 // src/lib/http.ts
 import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 
-export const API_BASE = 'http://172.17.10.23:8000';
+export const API_BASE = 'https://brainboost.pp.ua/api';
 
 // ← звір ці шляхи з бекендом і поправ, якщо інші:
 export const LOGIN_URL    = '/accounts/api/login/';

@@ -4,19 +4,25 @@ import { useA11y } from '@/context/AccessibilityContext';
 import { motion } from 'framer-motion';
 import { SlidersHorizontal, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 export default function SettingsA11yPage() {
   const { prefs, setPrefs, reset } = useA11y();
 
-  const previewStyle = useMemo(
+  // 👇 ВАЖНО: узнаём класс на <html> только в браузере
+  const [isOdys, setIsOdys] = useState(false);
+  useEffect(() => {
+    // безопасно в браузере
+    const has = typeof document !== 'undefined' &&
+      document.documentElement.classList.contains('font-odys');
+    setIsOdys(Boolean(has));
+  }, [prefs.font]);
+
+  const previewStyle = useMemo<React.CSSProperties>(
     () => ({
-      fontFamily:
-        document.documentElement.classList.contains('font-odys')
-          ? '"OpenDyslexic", system-ui'
-          : undefined,
+      fontFamily: isOdys ? '"OpenDyslexic", system-ui' : undefined,
     }),
-    [prefs.font]
+    [isOdys]
   );
 
   return (
@@ -174,13 +180,10 @@ export default function SettingsA11yPage() {
             </Card>
           </section>
 
-          {/* Превью блок */}
+          {/* Превʼю */}
           <section>
             <h3 className="text-slate-800 font-semibold mb-2">Превʼю</h3>
-            <div
-              className="rounded-2xl ring-1 ring-slate-200 p-5 bg-white"
-              style={previewStyle}
-            >
+            <div className="rounded-2xl ring-1 ring-slate-200 p-5 bg-white" style={previewStyle}>
               <h4 className="text-lg font-bold text-slate-800">Заголовок прикладу</h4>
               <p className="text-slate-700 mt-1">
                 Це приклад абзацу. Змінюйте розмір тексту, інтервал, шрифт і побачите, як система миттєво підлаштовується.

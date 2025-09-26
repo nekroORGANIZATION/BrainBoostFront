@@ -4,7 +4,7 @@ import { Afacad, Mulish } from 'next/font/google';
 import { AuthProvider } from '@/context/AuthContext';
 import { AccessibilityProvider } from '@/context/AccessibilityContext';
 import Navbar from '@/components/Navbar';
-
+//
 export const viewport = {
   width: 'device-width',
   initialScale: 1,

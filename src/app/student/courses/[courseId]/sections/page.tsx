@@ -50,9 +50,9 @@ type SectionVM = {
 
 /* ========= api ========= */
 const API = {
-  course: (id: string | number) => `http://127.0.0.1:8000/api/courses/${id}/`,
-  lessonsOfCourse: (cid: string | number) => `http://127.0.0.1:8000/api/lesson/courses/${cid}/lessons/`,
-  modulesOfCourse: (cid: string | number) => `http://127.0.0.1:8000/api/lesson/courses/${cid}/modules/`,
+  course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
+  lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
+  modulesOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/modules/`,
 };
 
 /* ========= helpers ========= */

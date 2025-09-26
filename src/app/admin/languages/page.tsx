@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 const ADMIN_LANG_LIST = `${API_BASE}/courses/admin/languages/`;
 const ADMIN_LANG_DETAIL = (id: number) => `${API_BASE}/courses/admin/languages/${id}/`;
 

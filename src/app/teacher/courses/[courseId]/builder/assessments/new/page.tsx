@@ -73,7 +73,7 @@ type TestDTO = {
 /* =====================================================
    Helpers
 ===================================================== */
-const API = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 const emptyQuestion = (seq:number): QuestionUI => ({
   id: seq,

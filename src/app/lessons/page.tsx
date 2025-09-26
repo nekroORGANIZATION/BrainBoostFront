@@ -88,7 +88,7 @@ export default function LessonsPage() {
 
     const fetchLessons = async () => {
       try {
-        const res = await axios.get('http://127.0.0.1:8000/api/lesson/admin/lessons/', {
+        const res = await axios.get('https://brainboost.pp.ua/api/api/lesson/admin/lessons/', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setLessons(res.data.results || []);

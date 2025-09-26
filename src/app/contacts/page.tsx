@@ -10,7 +10,7 @@ import FooterCard from '@/components/FooterCard';
 const CARD = 'rounded-[20px] bg-white ring-1 ring-[#E5ECFF] shadow-[0_8px_24px_rgba(2,28,78,0.06)]';
 const CARD_PAD = `${CARD} p-5`;
 const CARD_PAD_SM = `${CARD} p-4`;
-const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'http://127.0.0.1:8000/api/contacts/';
+const API_URL = process.env.NEXT_PUBLIC_CONTACTS_API || 'https://brainboost.pp.ua/api/api/contacts/';
 
 /* =========================================================
    ІКОНИ (currentColor, доступність, чисті path-и)

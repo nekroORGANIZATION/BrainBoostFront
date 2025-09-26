@@ -41,7 +41,7 @@ interface AnswerBreakdown {
 type AnswersMap = Record<number, string | number | number[]>;
 
 /* ===================== API ===================== */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 const API = {
   lessonTest    : (lessonId: number) => `${API_BASE}/api/tests/lessons/${lessonId}/test/`,

@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { ArrowLeft, Paperclip, Send, Smile, Loader2 } from 'lucide-react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://127.0.0.1:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 const CHATS_URL = `${API_BASE}/api/chat/chats/`;
 const MESSAGES_URL = `${API_BASE}/api/chat/messages/`; // GET ?chat=ID, POST { chat, text }
 const READ_URL = `${API_BASE}/api/chat/read/`;

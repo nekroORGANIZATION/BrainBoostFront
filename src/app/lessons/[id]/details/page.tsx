@@ -56,10 +56,10 @@ export default function LessonDetailsPage() {
     setLoading(true);
 
     // 1️⃣ Завантажуємо сам урок
-    const lessonReq = axios.get(`http://127.0.0.1:8000/api/lesson/admin/lessons/${id}/`, { headers });
+    const lessonReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/admin/lessons/${id}/`, { headers });
 
     // 2️⃣ Завантажуємо теорії окремо
-    const theoriesReq = axios.get(`http://127.0.0.1:8000/api/lesson/lesson/theories/${id}/`, { headers });
+    const theoriesReq = axios.get(`https://brainboost.pp.ua/api/api/lesson/lesson/theories/${id}/`, { headers });
 
     Promise.all([lessonReq, theoriesReq])
       .then(([lessonRes, theoriesRes]) => {

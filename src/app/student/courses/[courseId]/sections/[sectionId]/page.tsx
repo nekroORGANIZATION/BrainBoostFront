@@ -40,23 +40,31 @@ const API = {
 
 /* ========= helpers ========= */
 const asArray = <T,>(raw: any): T[] => (Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : []);
-async function fetchJSON<T>(url: string, tryBearer = true): Promise<T> {
-  let res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'include', cache: 'no-store' });
-  if (res.ok) return (await res.json()) as T;
+async function fetchJSON<T>(url: string, opts: RequestInit = {}): Promise<T> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
 
-  if (tryBearer && (res.status === 401 || res.status === 403)) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (token) {
-      res = await fetch(url, {
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (res.ok) return (await res.json()) as T;
-    }
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    ...(opts.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
-  const text = await res.text().catch(() => '');
-  throw new Error(`${res.status} ${text || res.statusText}`);
+
+  const res = await fetch(url, {
+    ...opts,
+    headers,
+    credentials: 'include',
+    cache: 'no-store',
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${text || res.statusText}`);
+  }
+
+  return (await res.json()) as T;
 }
 const fmt = (v?: string | number | null) => (v == null || v === '' ? '—' : String(v));
 const EASE = [0.16, 1, 0.3, 1] as const;

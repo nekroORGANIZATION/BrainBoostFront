@@ -18,29 +18,25 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
-/* ========= types (узгоджені з беком) ========= */
+/* ========= types ========= */
 type Course = { id: number; title: string; image?: string | null; description?: string | null };
-
 type ModuleLite = { id: number; title: string; order: number };
-
 type CourseLessonItem = {
   id: number;
   title: string;
   order: number;
   duration_min?: number | null;
-  module?: ModuleLite | null;     // з LessonPublicListWithProgressSerializer
+  module?: ModuleLite | null;
   completed?: boolean;
   result_percent?: number | null;
 };
-
 type DecoratedLesson = CourseLessonItem & {
   state: 'done' | 'next' | 'locked';
   locked: boolean;
 };
-
 type SectionVM = {
-  key: string;                    // "m:<id>" або "root"
-  module: ModuleLite | null;      // null для “Без розділу”
+  key: string;
+  module: ModuleLite | null;
   lessons: DecoratedLesson[];
   total: number;
   done: number;
@@ -48,11 +44,15 @@ type SectionVM = {
   next: DecoratedLesson | null;
 };
 
-/* ========= api ========= */
+/* ========= API ========= */
 const API = {
   course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
   lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
   modulesOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/modules/`,
+};
+
+const APIProgress = {
+  lesson: (lessonId: number) => `http://127.0.0.1:8000/api/lesson/progress/${lessonId}/`,
 };
 
 /* ========= helpers ========= */
@@ -140,7 +140,7 @@ function RingProgress({ value }: { value: number }) {
 /* ========= page ========= */
 export default function SectionsPage() {
   const params = useParams<{ courseId: string }>();
-  useSearchParams(); // залишено якщо потрібно debug з URL
+  useSearchParams();
   const courseId = Array.isArray(params.courseId) ? params.courseId[0] : params.courseId;
 
   const [course, setCourse] = useState<Course | null>(null);
@@ -149,8 +149,9 @@ export default function SectionsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [open, setOpen] = useState<Set<string>>(new Set()); // які модулі розгорнуті
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
+  /* ========= Завантаження курсу, уроків, модулів ========= */
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -166,7 +167,8 @@ export default function SectionsPage() {
 
         const lessonsData = asArray<CourseLessonItem>(lesRaw).slice();
         lessonsData.sort((a, b) => {
-          const ma = a.module?.order ?? 0, mb = b.module?.order ?? 0;
+          const ma = a.module?.order ?? 0,
+            mb = b.module?.order ?? 0;
           if (ma !== mb) return ma - mb;
           if (a.order !== b.order) return a.order - b.order;
           return a.id - b.id;
@@ -192,8 +194,7 @@ export default function SectionsPage() {
         mods.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.id - b.id);
         setModules(mods);
 
-        // Відкриваємо перший модуль з уроками за замовчуванням
-        const first = mods.find(m => lessonsData.some(l => l.module?.id === m.id));
+        const first = mods.find((m) => lessonsData.some((l) => l.module?.id === m.id));
         if (first) setOpen(new Set([keyOfModule(first)]));
       } catch (e: any) {
         if (!cancelled) {
@@ -206,18 +207,69 @@ export default function SectionsPage() {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [courseId]);
+
+  /* ========= Підтягання прогресу кожного уроку ========= */
+  useEffect(() => {
+    let cancelled = false;
+    if (!lessons.length) return;
+
+    const fetchProgress = async () => {
+      const updated = await Promise.all(
+        lessons.map(async (l) => {
+          try {
+            const progress = await fetchJSON<{ state: string; result_percent: number }>(APIProgress.lesson(l.id));
+            return {
+              ...l,
+              completed: progress.state === 'completed',
+              result_percent: progress.result_percent,
+            };
+          } catch {
+            return l;
+          }
+        })
+      );
+      if (!cancelled) setLessons(updated);
+    };
+
+    fetchProgress();
+
+    const onFocus = () => {
+      if (!cancelled) fetchProgress();
+    };
+
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') onFocus();
+    });
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [lessons]);
 
   /* ——— Глобальна послідовність уроків ——— */
   const seq = useMemo(() => {
     const ordered = lessons.slice();
     const firstUndoneIdx = ordered.findIndex(l => !l.completed);
-    const decorated: DecoratedLesson[] = ordered.map((l, idx) => {
-      if (l.completed) return { ...l, state: 'done', locked: false };
-      if (idx === firstUndoneIdx || firstUndoneIdx === -1) return { ...l, state: 'next', locked: false };
-      return { ...l, state: 'locked', locked: true };
+
+    // helper для типобезпечного створення DecoratedLesson
+    const decorateLesson = (l: CourseLessonItem, state: 'done' | 'next' | 'locked'): DecoratedLesson => ({
+      ...l,
+      state,
+      locked: state === 'locked',
     });
+
+    const decorated: DecoratedLesson[] = ordered.map((l, idx) => {
+      if (l.completed) return decorateLesson(l, 'done');
+      if (idx === firstUndoneIdx || firstUndoneIdx === -1) return decorateLesson(l, 'next');
+      return decorateLesson(l, 'locked');
+    });
+
     return decorated;
   }, [lessons]);
 
@@ -227,7 +279,7 @@ export default function SectionsPage() {
     for (const l of seq) {
       const key = l.module?.id != null ? keyOfModule(l.module) : 'root';
       if (!byKey.has(key)) byKey.set(key, []);
-      byKey.get(key)!.push(l);
+      byKey.get(key)!.push(l); // тепер TS не свариться
     }
 
     const out: SectionVM[] = [];
@@ -253,22 +305,13 @@ export default function SectionsPage() {
     }
 
     return out.sort((a, b) => (a.module?.order ?? -1) - (b.module?.order ?? -1));
-  }, [modules, lessons, seq]);
+  }, [modules, seq]);
+
 
   /* ========= skeleton ========= */
   if (loading) {
     return (
-      <main
-        className="min-h-screen relative"
-        style={
-          {
-            // базова пастельна палітра (можеш підкрутити)
-            ['--scene-from' as any]: '#ECF2FF',
-            ['--scene-mid' as any]: '#F3F7FF',
-            ['--scene-to' as any]: '#FFFFFF',
-          } as React.CSSProperties
-        }
-      >
+      <main className="min-h-screen relative">
         <Backdrop />
         <div className="relative max-w-6xl mx-auto p-4 sm:p-6">
           <div className="animate-pulse grid gap-4">
@@ -284,20 +327,10 @@ export default function SectionsPage() {
     );
   }
 
+  /* ========= Весь UI ========= */
   return (
-    <main
-      className="min-h-screen relative"
-      style={
-        {
-          // трохи темніший, але світлий фон
-          ['--scene-from' as any]: '#E7EEFF',
-          ['--scene-mid' as any]: '#F0F4FF',
-          ['--scene-to' as any]: '#FFFFFF',
-        } as React.CSSProperties
-      }
-    >
+    <main className="min-h-screen relative">
       <Backdrop />
-
       {/* HERO */}
       <section className="relative z-10">
         <div className="relative max-w-6xl mx-auto px-3 sm:px-4 md:px-6 pt-8 sm:pt-14">
@@ -334,7 +367,7 @@ export default function SectionsPage() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-[auto_1fr_auto] items-center relative z-10">
-              {/* Прогрес по курсу (інтегрально) */}
+              {/* Прогрес по курсу */}
               <div className="flex items-center gap-3 rounded-2xl bg-white/50 ring-1 ring-white/30 p-3 backdrop-blur">
                 <RingProgress value={overallPercent(sections)} />
                 <div>
@@ -358,7 +391,6 @@ export default function SectionsPage() {
             </div>
           </div>
 
-          {/* Пояснення */}
           <p className="mt-3 text-sm text-white/70">
             Уроки відкриваються послідовно. Після завершення уроку ти автоматично перейдеш до наступного.
           </p>
@@ -387,7 +419,6 @@ export default function SectionsPage() {
 
                   return (
                     <li key={sec.key} className="relative pl-14">
-                      {/* timeline node */}
                       <span className="absolute left-[14px] top-2 w-5 h-5 rounded-full bg-white ring-2 ring-indigo-300 shadow" />
 
                       <motion.div
@@ -466,10 +497,7 @@ export default function SectionsPage() {
                                         : 'from-slate-400/15 to-slate-400/5';
 
                                     return (
-                                      <li
-                                        key={l.id}
-                                        className={`relative p-4 sm:p-5 bg-gradient-to-br ${accent}`}
-                                      >
+                                      <li key={l.id} className={`relative p-4 sm:p-5 bg-gradient-to-br ${accent}`}>
                                         <div className="flex items-start justify-between gap-4">
                                           <div className="min-w-0">
                                             <div className="flex items-center gap-2">
@@ -496,7 +524,6 @@ export default function SectionsPage() {
                                             </div>
                                           </div>
 
-                                          {/* CTA */}
                                           {locked ? (
                                             <button
                                               disabled
@@ -540,71 +567,22 @@ export default function SectionsPage() {
   );
 }
 
-/* ========= background (з fallback-кольорами) ========= */
+/* ========= background ========= */
 function Backdrop() {
   return (
     <>
-      {/* градієнт; fallback якщо CSS-змінні не визначені */}
-      <div
-        className="absolute inset-0 -z-30"
-        style={{
-          background: `linear-gradient(to bottom,
-            var(--scene-from, #E9F0FF) 0%,
-            var(--scene-mid, #F2F6FF) 45%,
-            var(--scene-to, #FFFFFF) 100%)`,
-        }}
-      />
-
-      {/* біла вуаль */}
-      <div
-        className="absolute inset-0 -z-25 pointer-events-none"
-        style={{
-          background:
-            'linear-gradient(to bottom, rgba(255,255,255,.16), rgba(255,255,255,.12) 40%, rgba(255,255,255,.08))',
-        }}
-      />
-
-      {/* мʼякі плями */}
+      <div className="absolute inset-0 -z-30" style={{ background: `linear-gradient(to bottom, var(--scene-from, #E9F0FF) 0%, var(--scene-mid, #F2F6FF) 45%, var(--scene-to, #FFFFFF) 100%)` }} />
+      <div className="absolute inset-0 -z-25 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,.16), rgba(255,255,255,.12) 40%, rgba(255,255,255,.08))' }} />
       <div className="pointer-events-none absolute inset-0 -z-20 overflow-hidden">
-        <div
-          className="absolute -top-28 -left-32 h-[26rem] w-[26rem] rounded-full blur-[110px]"
-          style={{
-            background:
-              'radial-gradient(closest-side, rgba(59,91,219,.12), transparent 70%)',
-          }}
-        />
-        <div
-          className="absolute top-1/3 -right-28 h-[28rem] w-[28rem] rounded-full blur-[120px]"
-          style={{
-            background:
-              'radial-gradient(closest-side, rgba(31,156,240,.10), transparent 70%)',
-          }}
-        />
+        <div className="absolute -top-28 -left-32 h-[26rem] w-[26rem] rounded-full blur-[110px]" style={{ background: 'radial-gradient(closest-side, rgba(59,91,219,.12), transparent 70%)' }} />
+        <div className="absolute top-1/3 -right-28 h-[28rem] w-[28rem] rounded-full blur-[120px]" style={{ background: 'radial-gradient(closest-side, rgba(31,156,240,.10), transparent 70%)' }} />
       </div>
-
-      {/* делікатна зернистість */}
-      <div
-        className="absolute inset-0 -z-10 opacity-[0.045]"
-        style={{
-          backgroundImage:
-            'radial-gradient(rgba(0,0,0,.22) 1px, transparent 1px), radial-gradient(rgba(0,0,0,.10) 1px, transparent 1px)',
-          backgroundPosition: '0 0, 14px 14px',
-          backgroundSize: '28px 28px',
-        }}
-      />
+      <div className="absolute inset-0 -z-10 opacity-[0.045]" style={{ backgroundImage: 'radial-gradient(rgba(0,0,0,.22) 1px, transparent 1px), radial-gradient(rgba(0,0,0,.10) 1px, transparent 1px)', backgroundPosition: '0 0, 14px 14px', backgroundSize: '28px 28px' }} />
     </>
   );
 }
 
-/* ========= helpers (overall progress) ========= */
-function overallDone(sections: SectionVM[]) {
-  return sections.reduce((acc, s) => acc + s.done, 0);
-}
-function overallTotal(sections: SectionVM[]) {
-  return sections.reduce((acc, s) => acc + s.total, 0);
-}
-function overallPercent(sections: SectionVM[]) {
-  const total = overallTotal(sections);
-  const done = overallDone(sections);
-  return total ? (done / total) * 100 : 0;
-}
+/* ========= helpers ========= */
+function overallDone(sections: SectionVM[]) { return sections.reduce((acc, s) => acc + s.done, 0); }
+function overallTotal(sections: SectionVM[]) { return sections.reduce((acc, s) => acc + s.total, 0); }
+function overallPercent(sections: SectionVM[]) { const total = overallTotal(sections); const done = overallDone(sections); return total ? (done / total) * 100 : 0; }

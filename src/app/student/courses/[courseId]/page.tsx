@@ -51,7 +51,7 @@ type DecoratedLesson = CourseLessonItem & {
 
 /* ========= API ========= */
 const API = {
-  course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
+  course: (id: string | number) => `https://brainboost.pp.ua/api/courses/${id}/`,
   lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
   lessonProgress: (lessonId: number | string) => `https://brainboost.pp.ua/api/api/lesson/progress/${lessonId}/`,
 };

@@ -46,7 +46,7 @@ type SectionVM = {
 
 /* ========= API ========= */
 const API = {
-  course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
+  course: (id: string | number) => `https://brainboost.pp.ua/api/courses/${id}/`,
   lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
   modulesOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/modules/`,
 };

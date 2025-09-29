@@ -51,30 +51,38 @@ type DecoratedLesson = CourseLessonItem & {
 
 /* ========= API ========= */
 const API = {
-  course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
-  lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
+  course: (id: string | number) => `http://127.0.0.1:8000/api/courses/${id}/`,
+  lessonsOfCourse: (cid: string | number) => `http://127.0.0.1:8000/api/lesson/courses/${cid}/lessons/`,
+  lessonProgress: (lessonId: number | string) => `http://127.0.0.1:8000/api/lesson/progress/${lessonId}/`,
 };
 
 /* ========= helpers ========= */
 const asArray = <T,>(raw: any): T[] => (Array.isArray(raw) ? raw : Array.isArray(raw?.results) ? raw.results : []);
 
-async function fetchJSON<T>(url: string, tryBearer = true): Promise<T> {
-  let res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'include', cache: 'no-store' });
-  if (res.ok) return (await res.json()) as T;
+async function fetchJSON<T>(url: string, opts: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem("accessToken"); // 👈 твій токен після логіну
 
-  if (tryBearer && (res.status === 401 || res.status === 403)) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (token) {
-      res = await fetch(url, {
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-        credentials: 'include',
-        cache: 'no-store',
-      });
-      if (res.ok) return (await res.json()) as T;
-    }
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...(opts.headers as Record<string, string>),
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
   }
-  const text = await res.text().catch(() => '');
-  throw new Error(`${res.status} ${text || res.statusText}`);
+
+  const res = await fetch(url, {
+    ...opts,
+    headers,
+    credentials: "include", // залишаємо для підтримки куків
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`Fetch error: ${res.status}`);
+  }
+
+  return res.json();
 }
 
 const fmt = (v?: string | number | null) => (v == null || v === '' ? '—' : String(v));
@@ -139,27 +147,24 @@ export default function CoursePage() {
 
   React.useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         setLoading(true);
-        const [c, lesRaw] = await Promise.all([
+
+        // Беремо курс і уроки з прогресом відразу
+        const [c, lessonsRaw] = await Promise.all([
           fetchJSON<Course>(API.course(courseId)),
-          fetchJSON<CourseLessonItem[]>(API.lessonsOfCourse(courseId)),
+          fetchJSON<{ results: CourseLessonItem[] }>(API.lessonsOfCourse(courseId)),
         ]);
+
         if (cancelled) return;
 
-        const sorted = asArray<CourseLessonItem>(lesRaw)
-          .slice()
-          .sort((a, b) => {
-            const ma = a.module?.order ?? 0,
-              mb = b.module?.order ?? 0;
-            if (ma !== mb) return ma - mb;
-            if (a.order !== b.order) return a.order - b.order;
-            return a.id - b.id;
-          });
+        // витягуємо масив з results
+        const lessonsArr = lessonsRaw.results ?? [];
 
         setCourse(c);
-        setLessons(sorted);
+        setLessons(lessonsArr);
         setErr(null);
       } catch {
         if (!cancelled) {
@@ -171,6 +176,7 @@ export default function CoursePage() {
         if (!cancelled) setLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -187,7 +193,7 @@ export default function CoursePage() {
       const t = setTimeout(() => setToast(null), 3500);
       return () => clearTimeout(t);
     }
-  }, [search, router]);
+  }, [search, router])
 
   // послідовність і progress
   const seq = React.useMemo(() => {
@@ -201,11 +207,20 @@ export default function CoursePage() {
       return { ...l, state: 'locked', locked: true };
     });
 
-    const done = ordered.filter((l) => !!l.completed).length;
-    const pct = ordered.length ? Math.round((done / ordered.length) * 100) : 0;
+    const done = lessons.filter(l => l.completed).length;
+    const total = lessons.length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
 
-    return { ordered: decorated, next, pct, done, total: ordered.length };
+    return { ordered: decorated, next, pct, done, total};
   }, [lessons]);
+
+  console.log('Lesson progress:', {
+    done: seq.done,
+    total: seq.total,
+    pct: seq.pct,
+    lessons: lessons.map(l => ({ id: l.id, title: l.title, completed: l.completed }))
+  });
+
 
   const ratingNumber = React.useMemo(() => {
     const v = typeof course?.rating === 'string' ? parseFloat(course.rating) : course?.rating ?? 0;

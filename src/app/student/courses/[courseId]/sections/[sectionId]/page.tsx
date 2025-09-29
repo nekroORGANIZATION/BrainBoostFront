@@ -32,7 +32,7 @@ type Decorated = CourseLessonItem & { state: 'done' | 'next' | 'locked'; locked:
 
 /* ========= API ========= */
 const API = {
-  course: (id: string | number) => `https://brainboost.pp.ua/api/api/courses/${id}/`,
+  course: (id: string | number) => `https://brainboost.pp.ua/api/courses/${id}/`,
   lessonsOfCourse: (cid: string | number) => `https://brainboost.pp.ua/api/api/lesson/courses/${cid}/lessons/`,
   modulesOfCourse: (cid: string | number) =>
     `https://brainboost.pp.ua/api/api/lesson/public/courses/${cid}/modules/`, // може не існувати

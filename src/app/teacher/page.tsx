@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import TipOfDayCard from '@/components/TipOfDayCard';
 import http from '@/lib/http';
+import { mediaUrl } from '@/lib/media';
 
 /* ===================== CONFIG ===================== */
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
@@ -187,7 +188,7 @@ export default function TeacherDashboardPage() {
           })
           .map((c) => ({
             ...c,
-            image: c.image ? mediaUrl(c.image) : null,
+            image: mediaUrl(course.image || ''),
             rating: n(c.rating, 0),
             students_count: n(c.students_count, 0),
             status: c.status || 'draft',

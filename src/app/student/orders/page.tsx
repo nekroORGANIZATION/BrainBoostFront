@@ -3,23 +3,22 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Search, RefreshCw, CreditCard, Calendar, ExternalLink, Copy } from 'lucide-react';
 import http from '@/lib/http';
+import { mediaUrl } from '@/lib/media';
 
 const PURCHASED_URL = '/courses/me/purchased/';
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || '';
 
-type Course = { id: number; title: string; slug?: string; image?: string; price?: number | string };
+type Course = { id: number; title: string; slug?: string; image?: string | null; price?: number | string };
 type PurchaseRaw =
   | { id: number | string; course: Course | number; amount?: number | string; currency?: string; status?: string; created_at?: string; payment_method?: string; order_id?: string | number }
   | Course;
 type Paginated<T> = { count: number; next: string | null; previous: string | null; results: T[] };
 type PurchaseUI = { id: string; course: Course; status?: string; createdAt?: string; amount?: number; currency?: string; paymentMethod?: string; orderId?: string };
 
-const isAbs = (u?: string) => !!u && (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:'));
-const murl = (u?: string) => (!u ? '' : isAbs(u) ? u : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`);
 const getData = <T,>(resp: any): T => (resp && ('data' in resp ? resp.data : resp)) as T;
 const safeGetArray = <T,>(raw: any): T[] => (Array.isArray(raw) ? raw : raw?.results ?? []) as T[];
 const toNumber = (n: any): number | undefined => (Number.isFinite(+n) ? +n : undefined);
@@ -39,7 +38,7 @@ function normalizeOne(p: PurchaseRaw): PurchaseUI | null {
   if (!c) return null;
   return {
     id: String(r.id ?? c.id),
-    course: { id: c.id, title: c.title, slug: c.slug, image: c.image, price: toNumber(c.price) ?? undefined },
+    course: { id: c.id, title: c.title, slug: c.slug, image: c.image ?? null, price: toNumber(c.price) ?? undefined },
     status: r.status || undefined,
     createdAt: r.created_at || undefined,
     amount: toNumber(r.amount) ?? toNumber(c.price) ?? undefined,
@@ -106,7 +105,7 @@ function Button(
 
 /* ----------------------- Мобільна картка для покупки ---------------------- */
 function PurchaseCard({ p, index }: { p: PurchaseUI; index: number }) {
-  const img = p.course.image ? murl(p.course.image) : '';
+  const imgSrc = p.course.image ? mediaUrl(p.course.image) : '';
   const courseHref = `/courses/${p.course.slug || p.course.id}`;
   const badge =
     (p.status || 'completed').toLowerCase().includes('pend')
@@ -119,9 +118,9 @@ function PurchaseCard({ p, index }: { p: PurchaseUI; index: number }) {
   return (
     <div className="rounded-2xl ring-1 ring-slate-200 bg-white p-4 shadow-sm space-y-3">
       <div className="flex items-start gap-3">
-        <div className="h-16 w-24 overflow-hidden rounded-md ring-1 ring-slate-200 bg-white shrink-0">
-          {img ? (
-            <img src={img} alt="" className="h-full w-full object-cover" />
+        <div className="h-16 w-24 overflow-hidden rounded-md ring-1 ring-slate-200 bg-white shrink-0 relative">
+          {imgSrc ? (
+            <Image src={imgSrc} alt="" fill className="object-cover" sizes="96px" />
           ) : (
             <div className="grid h-full w-full place-items-center text-xs text-slate-400">no image</div>
           )}
@@ -386,7 +385,7 @@ export default function PurchasesPage() {
                   </tr>
                 ) : (
                   filtered.map((p, idx) => {
-                    const img = p.course.image ? murl(p.course.image) : '';
+                    const imgSrc = p.course.image ? mediaUrl(p.course.image) : '';
                     const courseHref = `/courses/${p.course.slug || p.course.id}`;
                     const badgeClass =
                       (p.status || 'completed').toLowerCase().includes('pend')
@@ -400,9 +399,9 @@ export default function PurchasesPage() {
                         <td className="py-3 px-5 align-middle text-center">{idx + 1}</td>
                         <td className="py-3 px-5 align-middle">
                           <div className="flex items-center gap-3">
-                            <div className="h-12 w-20 overflow-hidden rounded-md ring-1 ring-slate-200 bg-white">
-                              {img ? (
-                                <img src={img} alt="" className="h-full w-full object-cover" />
+                            <div className="h-12 w-20 overflow-hidden rounded-md ring-1 ring-slate-200 bg-white relative">
+                              {imgSrc ? (
+                                <Image src={imgSrc} alt="" fill className="object-cover" sizes="80px" />
                               ) : (
                                 <div className="grid h-full w-full place-items-center text-xs text-slate-400">no image</div>
                               )}

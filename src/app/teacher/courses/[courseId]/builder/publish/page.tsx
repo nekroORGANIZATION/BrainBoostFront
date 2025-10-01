@@ -104,7 +104,7 @@ export default function CoursePublishPage(){
   const patchCourse = async (data: Partial<CourseDto>) => {
     setBusy(true); setErr(null); setOk(null);
     try{
-      const r = await http.patch(`/api/courses/${courseId}/`, data);
+      const r = await http.patch(`/courses/${courseId}/`, data);
       setCourse(r.data as CourseDto);
       setOk('Зміни збережені.');
     } catch(e:any){

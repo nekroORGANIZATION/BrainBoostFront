@@ -381,7 +381,7 @@ export default function TeacherDashboardPage() {
                     <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] overflow-hidden bg-slate-100">
                       {c.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={ mediaUrl(course.image || '')} alt={c.title} className="w-full h-full object-cover" />
+                        <img src={mediaUrl(course.image)} alt={c.title} className="w-full h-full object-cover" />
                       ) : null}
                     </div>
 

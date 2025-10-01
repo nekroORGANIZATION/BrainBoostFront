@@ -68,7 +68,7 @@ export default function BuilderLayout({ children }: { children: React.ReactNode 
     async function fetchCourseMeta(): Promise<CourseMeta | null> {
       const urls = [
         `${API_BASE}/courses/${courseId}/`,
-        `${API_BASE}/api/courses/${courseId}/`,
+        `${API_BASE}/courses/${courseId}/`,
       ];
 
       for (const url of urls) {

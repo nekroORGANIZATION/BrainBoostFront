@@ -2,14 +2,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import TipOfDayCard from '@/components/TipOfDayCard';
 import http from '@/lib/http';
 import { mediaUrl } from '@/lib/media';
-
-/* ===================== CONFIG ===================== */
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 /* ===================== TYPES ===================== */
 type Course = {
@@ -47,20 +45,14 @@ function safeGetArray<T = any>(raw: any): T[] {
   return [];
 }
 function n(v: unknown, d = 0) {
-  const x = Number(v);
+  const x = typeof v === 'string' ? Number(v) : (v as number);
   return Number.isFinite(x) ? x : d;
 }
 function fmt(num: number) {
   return new Intl.NumberFormat('uk-UA').format(num);
 }
 function money(num: number) {
-  return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAN' }).format(num);
-}
-function mediaUrl(u?: string | null) {
-  if (!u) return '';
-  return /^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:')
-    ? u
-    : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`;
+  return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(num);
 }
 
 /* ===================== SMALL UI ===================== */
@@ -166,9 +158,7 @@ export default function TeacherDashboardPage() {
       setLoading(true);
       setErr(null);
       try {
-        // ✅ головний список курсів через axios-клієнт з Bearer
         const r = await http.get('/courses/', { params: { page_size: 200 }, signal: controller.signal as any });
-
         const allCourses = safeGetArray<Course>(r.data);
 
         const uid = user?.id;
@@ -188,6 +178,7 @@ export default function TeacherDashboardPage() {
           })
           .map((c) => ({
             ...c,
+            // здесь mediaUrl маппит на public/course_image/<basename>
             image: c.image ? mediaUrl(c.image) : null,
             rating: n(c.rating, 0),
             students_count: n(c.students_count, 0),
@@ -256,7 +247,7 @@ export default function TeacherDashboardPage() {
     );
   }
 
-  const avatar = user?.profile_picture ? mediaUrl(user.profile_picture) : '/images/defuser.png';
+  const avatarSrc = user?.profile_picture ? mediaUrl(user.profile_picture) : '/images/defuser.png';
   const name = user?.first_name ? `${user.first_name}` : user?.username || 'Викладач';
   const isCertified = !!user?.is_certified_teacher || !!user?.is_superuser;
 
@@ -270,9 +261,8 @@ export default function TeacherDashboardPage() {
           transition={{ duration: 0.5, ease: 'easeOut' }}
           className="rounded-[24px] bg-white/90 ring-1 ring-[#E5ECFF] p-6 md:p-8 shadow-[0_10px_30px_rgba(2,28,78,0.10)] grid md:grid-cols-[auto_1fr] gap-6"
         >
-          <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={avatar} alt={name} className="w-full h-full object-cover" />
+          <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-white shrink-0 relative">
+            <Image src={avatarSrc} alt={name} fill className="object-cover" sizes="80px" />
           </div>
           <div className="min-w-0">
             <div className="text-sm text-slate-600">Вітаємо у викладацькому просторі</div>
@@ -298,7 +288,6 @@ export default function TeacherDashboardPage() {
               <Link href="/teacher/chats" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
                 Мої чати
               </Link>
-              {/* окремого розділу "Уроки" більше немає — все у Builder */}
               <Link href="/teacher/settings" className="inline-flex items-center justify-center px-4 py-2 rounded-xl ring-1 ring-[#E5ECFF] bg-white hover:ring-[#1345DE] transition">
                 Налаштування
               </Link>
@@ -315,7 +304,7 @@ export default function TeacherDashboardPage() {
 
       {/* Verification banner */}
       {!isCertified && (
-        <section className="w-full max-w-screen-xl mx-auto px-4 md:px-6 mt-6">
+        <section className="w-full max-w-screen-xl mx.auto px-4 md:px-6 mt-6">
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
             <VerificationBanner />
           </motion.div>
@@ -378,10 +367,15 @@ export default function TeacherDashboardPage() {
                     className="grid grid-cols-1 md:grid-cols-[56px_1fr_100px_100px_200px] gap-4 items-center py-3"
                   >
                     {/* cover */}
-                    <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] overflow-hidden bg-slate-100">
+                    <div className="w-14 h-10 rounded-md ring-1 ring-[#E5ECFF] overflow-hidden bg-slate-100 relative">
                       {c.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={String(c.image)} alt={c.title} className="w-full h-full object-cover" />
+                        <Image
+                          src={String(c.image)}
+                          alt={c.title}
+                          fill
+                          className="object-cover"
+                          sizes="56px"
+                        />
                       ) : null}
                     </div>
 
@@ -406,7 +400,6 @@ export default function TeacherDashboardPage() {
 
                     {/* actions */}
                     <div className="flex md:justify-end items-center gap-2 flex-nowrap whitespace-nowrap">
-                      {/* головна точка входу → Overview */}
                       <Link
                         href={`/teacher/courses/${c.id}/builder/overview`}
                         className="inline-flex items-center px-3 py-1.5 rounded-xl ring-1 ring-[#E5ECFF] text-sm bg-white hover:ring-[#1345DE] active:translate-y-[1px] transition"

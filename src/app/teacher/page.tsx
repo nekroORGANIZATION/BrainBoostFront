@@ -188,7 +188,7 @@ export default function TeacherDashboardPage() {
           })
           .map((c) => ({
             ...c,
-            image: mediaUrl(course.image || ''),
+            image: c.image ? mediaUrl(c.image) : null,
             rating: n(c.rating, 0),
             students_count: n(c.students_count, 0),
             status: c.status || 'draft',

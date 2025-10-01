@@ -5,24 +5,23 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE || 'https://brainboost.pp.ua/api';
 
 // ← звір ці шляхи з бекендом і поправ, якщо інші:
-export const LOGIN_URL    = '/accounts/api/login/';
+export const LOGIN_URL    = '/accounts/api/login/';          // TokenObtainPairView
 export const REGISTER_URL = '/accounts/api/register/';
 export const ME_URL       = '/accounts/api/profile/';
 export const REFRESH_URL  = '/accounts/api/token/refresh/';
 
 const inBrowser = typeof window !== 'undefined';
 
-/** =================================================================
+/* ============================================================
  *  Єдина “істина” щодо токена в памʼяті. В заголовки його штовхає
  *  лише setAuthHeader(). Запити підстраховуються: якщо токен не
  *  виставлений — спробують дістати зі storage.
- * ================================================================= */
+ * ============================================================ */
 let currentAccessToken: string | null = null;
-const AUTH_SCHEME = 'Bearer'; // для SimpleJWT: 'Bearer'; якщо у вас 'JWT' — заміни тут.
+const AUTH_SCHEME = 'Bearer'; // Для SimpleJWT: 'Bearer'. Якщо у вас 'JWT' — заміни тут.
 
 export function setAuthHeader(token?: string | null) {
   currentAccessToken = token ?? null;
-
   if (currentAccessToken) {
     http.defaults.headers.common.Authorization = `${AUTH_SCHEME} ${currentAccessToken}`;
   } else {
@@ -30,7 +29,7 @@ export function setAuthHeader(token?: string | null) {
   }
 }
 
-/** Яке сховище містить конкретний ключ (session чи local) */
+/* ------------------------- Storage helpers ------------------------- */
 function whichStorageHas(key: 'access' | 'refresh'): 'session' | 'local' | null {
   if (!inBrowser) return null;
   if (sessionStorage.getItem(key)) return 'session';
@@ -43,16 +42,18 @@ function readStored(key: 'access' | 'refresh'): string | null {
   return sessionStorage.getItem(key) ?? localStorage.getItem(key);
 }
 
-function writeStored(key: 'access' | 'refresh', val: string | null, prefer: 'session' | 'local' | null) {
+function writeStored(
+  key: 'access' | 'refresh',
+  val: string | null,
+  prefer: 'session' | 'local' | null
+) {
   if (!inBrowser) return;
   const target = prefer === 'session' ? sessionStorage : prefer === 'local' ? localStorage : localStorage;
   const other  = target === localStorage ? sessionStorage : localStorage;
 
-  if (val === null) {
-    target.removeItem(key);
-  } else {
-    target.setItem(key, val);
-  }
+  if (val === null) target.removeItem(key);
+  else target.setItem(key, val);
+
   // Тримаємо копію тільки в одному сховищі
   other.removeItem(key);
 }
@@ -63,19 +64,19 @@ function clearAllTokens() {
   sessionStorage.removeItem('access'); sessionStorage.removeItem('refresh');
 }
 
-/** =================================================================
+/* ============================================================
  *  Axios інстанс
- * ================================================================= */
+ * ============================================================ */
 const http = axios.create({
   baseURL: API_BASE,
-  // НЕ задаємо тут Content-Type — нехай Axios сам ставить для JSON/FormData
+  // НЕ задаємо Content-Type — нехай Axios сам ставить для JSON/FormData
   withCredentials: false,
 });
 
-/** -----------------------------------------------------------------
+/* ------------------------------------------------------------
  *  REQUEST: підстраховка — якщо заголовок не виставили через
  *  setAuthHeader, дістанемо токен зі storage (session → local).
- * ----------------------------------------------------------------- */
+ * ------------------------------------------------------------ */
 http.interceptors.request.use((config) => {
   const hasAuth = !!config.headers?.Authorization;
   if (!hasAuth) {
@@ -83,7 +84,7 @@ http.interceptors.request.use((config) => {
       config.headers = config.headers || {};
       (config.headers as any).Authorization = `${AUTH_SCHEME} ${currentAccessToken}`;
     } else {
-      // Легка підстраховка: дістати токен зі storage (щоб перший рендер не ловив 401)
+      // підстраховка: дістаємо токен зі storage (щоб перший рендер не ловив 401)
       const stored = readStored('access');
       if (stored) {
         setAuthHeader(stored);
@@ -95,9 +96,9 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
-/** =================================================================
- *  RESPONSE: refresh-token flow із чергою під час оновлення
- * ================================================================= */
+/* ============================================================
+ *  RESPONSE: refresh-flow із чергою на час оновлення
+ * ============================================================ */
 let isRefreshing = false;
 let pendingQueue: Array<(tkn: string | null) => void> = [];
 
@@ -108,7 +109,7 @@ function flushQueue(token: string | null) {
   pendingQueue = [];
 }
 
-async function refreshAccess(): Promise<{ access: string | null, store: 'session' | 'local' | null }> {
+async function refreshAccess(): Promise<{ access: string | null; store: 'session' | 'local' | null }> {
   const store = whichStorageHas('refresh');
   const refresh = readStored('refresh');
   if (!refresh) return { access: null, store: null };
@@ -128,6 +129,7 @@ http.interceptors.response.use(
     const status = error.response?.status;
     const original = error.config as (AxiosRequestConfig & { _retry?: boolean });
 
+    // Тільки для першого 401 по конкретному запиту
     if (status === 401 && !original?._retry) {
       original._retry = true;
 
@@ -153,14 +155,14 @@ http.interceptors.response.use(
           flushQueue(null);
           clearAllTokens();
           setAuthHeader(null);
-          if (inBrowser && !location.pathname.startsWith('/login')) {
-            // мʼякий редірект на логін
-            window.location.href = '/login';
+          if (inBrowser) {
+            // мʼякий редірект на логін (вже без токенів)
+            if (!location.pathname.startsWith('/login')) window.location.href = '/login';
           }
           return Promise.reject(error);
         }
 
-        // Зберігаємо оновлений access в те ж сховище, де був refresh
+        // Зберігаємо оновлений access в те ж сховище, де лежить refresh
         writeStored('access', newAccess, store);
         setAuthHeader(newAccess);
         flushQueue(newAccess);
@@ -181,7 +183,7 @@ http.interceptors.response.use(
       }
     }
 
-    // інші помилки — далі по ланцюжку
+    // інші помилки — віддаємо далі
     return Promise.reject(error);
   }
 );

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import http, { API_BASE } from '@/lib/http';
 import { CheckCircle2, XCircle, RotateCw, Trash2, ExternalLink, ChevronDown } from "lucide-react";
 
+// 🔽 общий медиахелпер
+import { mediaUrl, avatarUrl } from '@/lib/media';
 
 /* =========================
    Конфіг
@@ -35,15 +37,12 @@ type ReviewAdmin = {
 type Course = { id: number; title: string };
 
 /* =========================
-   Медіа-хелпери
+   Медіа-хелпери локально
 ========================= */
 function isAbsUrl(u?: string) {
   return !!u && (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:'));
 }
-function mediaUrl(u?: string) {
-  if (!u) return '';
-  return isAbsUrl(u) ? u : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`;
-}
+// маппим картинки отзывов (не аватары)
 function mapImages(items?: { id: number; image: string }[]) {
   return (items || []).map((x) => ({ ...x, image: mediaUrl(x.image) }));
 }
@@ -210,7 +209,7 @@ export default function AdminReviewsPage() {
 
         const arr = safeArr<ReviewAdmin>(r.data).map((x) => ({
           ...x,
-          user_avatar: mediaUrl(x.user_avatar),
+          user_avatar: avatarUrl(x.user_avatar),   // 👈 аватар
           images: mapImages(x.images),
         }));
         if (!cancelled) setItems(arr);
@@ -379,7 +378,7 @@ export default function AdminReviewsPage() {
 
       {/* Липка панель фільтрів + дій */}
       <div ref={stickyRef} className="h-0" />
-      <section className={cx(stuck && 'sticky top-0 z-40 shadow-[0_8px_24px_rgba(2,28,78,0.08)]')}>
+      <section className={cx(stuck && 'sticky top-0 z-40 shadow-[0_8px_24px_rgба(2,28,78,0.08)]')}>
         <div className={cx(CONTAINER, 'bg-white/90 backdrop-blur rounded-[15px] shadow-md p-4')}>
           <div className="grid grid-cols-12 gap-3 py-4">
             <div className="col-span-12 lg:col-span-5">
@@ -650,6 +649,7 @@ export default function AdminReviewsPage() {
     </main>
   );
 }
+
 function AdminCard({
   it,
   courseTitle,
@@ -670,7 +670,8 @@ function AdminCard({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const avatar = mediaUrl(it.user_avatar);
+  const avatar = avatarUrl(it.user_avatar) || '/images/defuser.png'; // 👈 тут
+
   const longText = (it.text?.length || 0) > 220;
 
   const tone = it.status === 'approved' ? 'green' : it.status === 'rejected' ? 'red' : 'yellow';
@@ -683,17 +684,8 @@ function AdminCard({
   const dot = tone === 'green' ? 'bg-green-500' : tone === 'red' ? 'bg-red-500' : 'bg-yellow-500';
 
   return (
-    /* ЗОВНІШНІЙ GLOW: SVG (не залежить від Tailwind арбітрарних класів) */
     <div className="relative z-0">
-      <svg
-        aria-hidden
-        className="pointer-events-none absolute -z-10 -inset-10"
-        width="0"
-        height="0"
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        style={{ filter: 'blur(28px)' }}
-      >
+      <svg aria-hidden className="pointer-events-none absolute -z-10 -inset-10" width="0" height="0" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ filter: 'blur(28px)' }}>
         <defs>
           <radialGradient id="glowA" cx="50%" cy="-10%" r="110%">
             <stop offset="0%" stopColor="rgba(56,189,248,0.35)" />
@@ -708,19 +700,8 @@ function AdminCard({
         <rect x="0" y="0" width="100%" height="100%" fill="url(#glowB)" />
       </svg>
 
-      {/* КАРТКА з ВНУТРІШНІМ ГРАДІЄНТОМ (видно навіть якщо overflow:hidden на батькові) */}
-      <article
-        className="relative overflow-hidden rounded-3xl ring-1 ring-[#E5ECFF]
-                   shadow-[0_24px_70px_rgba(2,28,78,0.14)] hover:shadow-[0_30px_96px_rgba(2,28,78,0.18)]
-                   transition-all"
-      >
-        {/* внутрішній градієнт — окремий SVG під контентом */}
-        <svg
-          aria-hidden
-          className="absolute inset-0 -z-10"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
+      <article className="relative overflow-hidden rounded-3xl ring-1 ring-[#E5ECFF] shadow-[0_24px_70px_rgба(2,28,78,0.14)] hover:shadow-[0_30px_96px_rgба(2,28,78,0.18)] transition-all">
+        <svg aria-hidden className="absolute inset-0 -z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
           <defs>
             <linearGradient id="cardBase" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#ffffff" />
@@ -740,18 +721,18 @@ function AdminCard({
           <rect width="100%" height="100%" fill="url(#tintR)" />
         </svg>
 
-        {/* верхня смуга-акцент */}
         <div className={`h-1.5 w-full bg-gradient-to-r ${topBar}`} />
 
         <header className="flex items-start gap-4 p-5">
           <input type="checkbox" checked={checked} onChange={onCheck} className="mt-1 accent-[#1345DE]" />
 
-          {/* аватар + статус */}
+          {/* аватар */}
           <div className="relative shrink-0">
             <img
-              src={avatar || '/images/avatar1.png'}
+              src={avatar}
               alt={it.user_name}
               className="w-12 h-12 rounded-full object-cover ring-2 ring-white"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/defuser.png'; }}
             />
             <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ring-2 ring-white ${dot}`} />
           </div>
@@ -774,30 +755,8 @@ function AdminCard({
               </div>
             </div>
 
-            {/* текст + фейд */}
-            <div className="relative mt-3">
-              <p className={cx('text-slate-800 whitespace-pre-line leading-relaxed', !open && 'line-clamp-4')}>
-                {it.text}
-              </p>
-              {!open && longText && (
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent"
-                />
-              )}
-              {longText && (
-                <button
-                  onClick={() => setOpen(o => !o)}
-                  className="mt-2 inline-flex items-center gap-1 text-[#1345DE] font-semibold
-                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1345DE]/50 rounded-md"
-                >
-                  {open ? 'Згорнути' : 'Показати повністю'}
-                  <svg className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none">
-                    <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            {/* текст */}
+            <ReviewText text={it.text} />
 
             {/* медіа */}
             {(it.images?.length || it.video_url) && (
@@ -841,65 +800,123 @@ function AdminCard({
             {/* розділювач */}
             <div className="mt-5 h-px w-full bg-gradient-to-r from-transparent via-slate-200/80 to-transparent" />
 
-            {/* кнопки — в один ряд, рівні */}
-            <div className="mt-3">
-              <div className="flex flex-nowrap items-center gap-2 rounded-2xl bg-white/90 backdrop-blur ring-1 ring-[#E5ECFF] px-2.5 py-2 shadow-[0_12px_28px_rgba(2,28,78,0.08)]">
-                {it.status !== 'approved' && (
-                  <button
-                    onClick={onApprove}
-                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
-                               bg-gradient-to-b from-emerald-500 to-emerald-600 text-white
-                               shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_24px_rgba(16,185,129,0.35)]
-                               hover:brightness-105 active:translate-y-[1px]
-                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                    title="Схвалити"
-                  >
-                    ✓ <span>Схвалити</span>
-                  </button>
-                )}
-                {it.status !== 'rejected' && (
-                  <button
-                    onClick={onReject}
-                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
-                               bg-gradient-to-b from-amber-500 to-amber-600 text-white
-                               shadow-[inset_0_1px_0_rgба(255,255,255,0.35),0_10px_24px_rgба(234,179,8,0.35)]
-                               hover:brightness-105 active:translate-y-[1px]
-                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-                    title="Відхилити"
-                  >
-                    ✕ <span>Відхилити</span>
-                  </button>
-                )}
-                {it.status !== 'pending' && (
-                  <button
-                    onClick={onReturn}
-                    className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
-                               bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50
-                               shadow-[inset_0_1px_0_rgба(255,255,255,0.6),0_8px_18px_rgба(2,28,78,0.06)]
-                               active:translate-y-[1px]
-                               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
-                    title="Повернути на модерацію"
-                  >
-                    ⟲ <span>Повернути</span>
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* кнопки */}
+            <CardActions
+              status={it.status}
+              onApprove={onApprove}
+              onReject={onReject}
+              onReturn={onReturn}
+            />
           </div>
         </header>
 
         {/* стрічка статусу */}
-        <div className="pointer-events-none absolute -right-10 top-5 rotate-45">
-          <div
-            className={cx(
-              'px-10 py-1 text-xs font-bold text-white shadow',
-              tone === 'green' ? 'bg-green-600' : tone === 'red' ? 'bg-red-600' : 'bg-yellow-600'
-            )}
-          >
-            {it.status === 'approved' ? 'Схвалено' : it.status === 'rejected' ? 'Відхилено' : 'На модерації'}
-          </div>
-        </div>
+        <Ribbon status={it.status} />
       </article>
+    </div>
+  );
+}
+
+function ReviewText({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const longText = (text?.length || 0) > 220;
+  return (
+    <div className="relative mt-3">
+      <p className={cx('text-slate-800 whitespace-pre-line leading-relaxed', !open && 'line-clamp-4')}>
+        {text}
+      </p>
+      {!open && longText && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent"
+        />
+      )}
+      {longText && (
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="mt-2 inline-flex items-center gap-1 text-[#1345DE] font-semibold
+                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1345DE]/50 rounded-md"
+        >
+          {open ? 'Згорнути' : 'Показати повністю'}
+          <svg className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none">
+            <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CardActions({
+  status,
+  onApprove,
+  onReject,
+  onReturn,
+}: {
+  status: 'pending' | 'approved' | 'rejected';
+  onApprove: () => void;
+  onReject: () => void;
+  onReturn: () => void;
+}) {
+  return (
+    <div className="mt-3">
+      <div className="flex flex-nowrap items-center gap-2 rounded-2xl bg-white/90 backdrop-blur ring-1 ring-[#E5ECFF] px-2.5 py-2 shadow-[0_12px_28px_rgба(2,28,78,0.08)]">
+        {status !== 'approved' && (
+          <button
+            onClick={onApprove}
+            className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                       bg-gradient-to-b from-emerald-500 to-emerald-600 text-white
+                       shadow-[inset_0_1px_0_rgба(255,255,255,0.35),0_10px_24px_rgба(16,185,129,0.35)]
+                       hover:brightness-105 active:translate-y-[1px]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+            title="Схвалити"
+          >
+            ✓ <span>Схвалити</span>
+          </button>
+        )}
+        {status !== 'rejected' && (
+          <button
+            onClick={onReject}
+            className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                       bg-gradient-to-b from-amber-500 to-amber-600 text-white
+                       shadow-[inset_0_1px_0_rgба(255,255,255,0.35),0_10px_24px_rgба(234,179,8,0.35)]
+                       hover:brightness-105 active:translate-y-[1px]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            title="Відхилити"
+          >
+            ✕ <span>Відхилити</span>
+          </button>
+        )}
+        {status !== 'pending' && (
+          <button
+            onClick={onReturn}
+            className="h-10 min-w-[132px] px-4 rounded-xl inline-flex items-center justify-center gap-2
+                       bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50
+                       shadow-[inset_0_1px_0_rgба(255,255,255,0.6),0_8px_18px_rgба(2,28,78,0.06)]
+                       active:translate-y-[1px]
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+            title="Повернути на модерацію"
+          >
+            ⟲ <span>Повернути</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Ribbon({ status }: { status: 'pending' | 'approved' | 'rejected' }) {
+  const tone = status === 'approved' ? 'green' : status === 'rejected' ? 'red' : 'yellow';
+  return (
+    <div className="pointer-events-none absolute -right-10 top-5 rotate-45">
+      <div
+        className={cx(
+          'px-10 py-1 text-xs font-bold text-white shadow',
+          tone === 'green' ? 'bg-green-600' : tone === 'red' ? 'bg-red-600' : 'bg-yellow-600'
+        )}
+      >
+        {status === 'approved' ? 'Схвалено' : status === 'rejected' ? 'Відхилено' : 'На модерації'}
+      </div>
     </div>
   );
 }

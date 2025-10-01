@@ -62,7 +62,7 @@ export default function CoursePublishPage(){
     setLoading(true); setErr(null);
     try{
       const [cRes, lRes] = await Promise.all([
-        http.get(`/api/courses/${courseId}/`),
+        http.get(`/courses/${courseId}/`),
         http.get(`/lesson/admin/lessons/`, { params:{ course: courseId, page_size: 200, ordering:'order' } }),
       ]);
       setCourse(cRes.data as CourseDto);

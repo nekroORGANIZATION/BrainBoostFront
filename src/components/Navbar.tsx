@@ -3,13 +3,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 type NavbarProps = { hideOn?: string[] };
 
 export default function Navbar({ hideOn = [] }: NavbarProps) {
-  const { isAuthenticated, logout, bootstrapped } = useAuth();
+  const { isAuthenticated, logout, bootstrapped, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -17,7 +17,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
   // Закривати моб-меню при навігації
   useEffect(() => { setOpen(false); }, [pathname]);
 
-  // Жёсткий редирект с /login и /register в /profile, как только контекст готов и авторизация есть
+  // Если уже авторизован и попал на /login или /register — увести на профиль.
   useEffect(() => {
     if (!bootstrapped) return;
     const onAuthPage = pathname === '/login' || pathname === '/register';
@@ -26,7 +26,19 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
     }
   }, [bootstrapped, isAuthenticated, pathname, router]);
 
-  // Пункти меню
+  // Быстрый локальный чек токена (на случай, когда контекст ещё не успел подхватить, а токен уже есть в storage)
+  const tokenInStorage = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem('access') ?? localStorage.getItem('access');
+  }, [pathname]);
+
+  // Что считаем "вошёл":
+  // 1) user получен (самый надёжный вариант),
+  // 2) либо контекст уже видит токен,
+  // 3) либо токен уже лежит в хранилище (на случай мгновенного redirect после логина без обновления контекста).
+  const loggedIn = !!user || isAuthenticated || !!tokenInStorage;
+
+  // Пункты меню
   const menuItems = [
     { href: '/courses',  label: 'Всі курси' },
     { href: '/reviews',  label: 'Відгуки' },
@@ -44,7 +56,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
   const shouldHide = hideOn.some((p) => pathname === p || pathname.startsWith(p + '/'));
   if (shouldHide) return null;
 
-  // Пока контекст инициализируется — не рисуем кнопки логина/профиля (без миганий UI)
+  // Пока контекст не bootstrapped — отрисуем только шапку без кнопок (без миганий)
   if (!bootstrapped) {
     return (
       <header className="sticky top-0 z-[9999] w-full bg-transparent bg-[url('/images/back.png')] bg-cover bg-fixed bg-center/cover backdrop-blur-sm">
@@ -108,7 +120,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
 
         {/* Правий блок (desktop) */}
         <div className="row-start-1 col-start-3 hidden md:flex shrink-0 justify-self-end items-center gap-5 lg:gap-7">
-          {!isAuthenticated ? (
+          {!loggedIn ? (
             <Link
               href="/login"
               className="rounded-2xl bg-[#1345DE] px-5 py-2.5 text-[15px] font-bold text-white transition hover:bg-[#0e2fbe]"
@@ -177,7 +189,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
 
       {/* Мобільний дроуер */}
       <div
-        className={`md:hidden overflow-hidden border-top border-slate-200 transition-[max-height] duration-300 ease-in-out ${open ? 'max-h-[80vh]' : 'max-h-0'}`}
+        className={`md:hidden overflow-hidden border-t border-slate-200 transition-[max-height] duration-300 ease-in-out ${open ? 'max-h-[80vh]' : 'max-h-0'}`}
       >
         <div className={`${Wrap} px-4 py-4`}>
           <div className="grid gap-3">
@@ -186,7 +198,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
                 key={item.href}
                 href={item.href}
                 className={`rounded-2xl px-4 py-3 text-[17px] font-semibold ring-1 ring-[#E5ECFF] bg-white/95 backdrop-blur active:scale-[0.99] transition
-                  ${isAuthenticated && isActive(item.href) ? 'text-[#1345DE] ring-[#1345DE]' : 'text-[#0B1437]'}`}
+                  ${isActive(item.href) ? 'text-[#1345DE] ring-[#1345DE]' : 'text-[#0B1437]'}`}
               >
                 {item.label}
               </Link>
@@ -194,7 +206,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            {!isAuthenticated ? (
+            {!loggedIn ? (
               <Link
                 href="/login"
                 className="rounded-2xl bg-[#1345DE] px-6 py-3 text-[16px] font-bold text-white transition hover:bg-[#0e2fbe]"

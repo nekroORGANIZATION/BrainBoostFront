@@ -2,19 +2,29 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
 type NavbarProps = { hideOn?: string[] };
 
 export default function Navbar({ hideOn = [] }: NavbarProps) {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout, bootstrapped } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   // Закривати моб-меню при навігації
   useEffect(() => { setOpen(false); }, [pathname]);
+
+  // Жёсткий редирект с /login и /register в /profile, как только контекст готов и авторизация есть
+  useEffect(() => {
+    if (!bootstrapped) return;
+    const onAuthPage = pathname === '/login' || pathname === '/register';
+    if (onAuthPage && isAuthenticated) {
+      router.replace('/profile');
+    }
+  }, [bootstrapped, isAuthenticated, pathname, router]);
 
   // Пункти меню
   const menuItems = [
@@ -34,6 +44,19 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
   const shouldHide = hideOn.some((p) => pathname === p || pathname.startsWith(p + '/'));
   if (shouldHide) return null;
 
+  // Пока контекст инициализируется — не рисуем кнопки логина/профиля (без миганий UI)
+  if (!bootstrapped) {
+    return (
+      <header className="sticky top-0 z-[9999] w-full bg-transparent bg-[url('/images/back.png')] bg-cover bg-fixed bg-center/cover backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-[1680px] px-4 sm:px-6 md:px-10 lg:px-14 xl:px-20 2xl:px-28 py-3">
+          <div className="h-[64px] flex items-center">
+            <Image src="/images/logo.png" alt="Brainboost" width={270} height={64} priority />
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   // Широкий контейнер
   const Wrap = 'mx-auto w-full max-w-[1680px] px-4 sm:px-6 md:px-10 lg:px-14 xl:px-20 2xl:px-28';
 
@@ -48,7 +71,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
           className="relative row-start-1 col-start-1 shrink-0 block h-[52px] w-[210px] md:h-[58px] md:w-[240px] lg:h-[64px] lg:w-[270px]"
         >
           <Image
-            src="/images/logo.png"        // змінюй шлях за потреби
+            src="/images/logo.png"
             alt="Brainboost"
             fill
             priority
@@ -85,8 +108,6 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
 
         {/* Правий блок (desktop) */}
         <div className="row-start-1 col-start-3 hidden md:flex shrink-0 justify-self-end items-center gap-5 lg:gap-7">
-          
-
           {!isAuthenticated ? (
             <Link
               href="/login"
@@ -125,7 +146,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
           )}
         </div>
 
-        {/* BREADCRUMB — фіксовано під логотипом, без JS-обчислень */}
+        {/* BREADCRUMB */}
         {pathname !== '/' && (
           <div className="row-start-2 col-start-1 justify-self-start">
             <nav
@@ -156,7 +177,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
 
       {/* Мобільний дроуер */}
       <div
-        className={`md:hidden overflow-hidden border-t border-slate-200 transition-[max-height] duration-300 ease-in-out ${open ? 'max-h-[80vh]' : 'max-h-0'}`}
+        className={`md:hidden overflow-hidden border-top border-slate-200 transition-[max-height] duration-300 ease-in-out ${open ? 'max-h-[80vh]' : 'max-h-0'}`}
       >
         <div className={`${Wrap} px-4 py-4`}>
           <div className="grid gap-3">
@@ -165,7 +186,7 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
                 key={item.href}
                 href={item.href}
                 className={`rounded-2xl px-4 py-3 text-[17px] font-semibold ring-1 ring-[#E5ECFF] bg-white/95 backdrop-blur active:scale-[0.99] transition
-                  ${isActive(item.href) ? 'text-[#1345DE] ring-[#1345DE]' : 'text-[#0B1437]'}`}
+                  ${isAuthenticated && isActive(item.href) ? 'text-[#1345DE] ring-[#1345DE]' : 'text-[#0B1437]'}`}
               >
                 {item.label}
               </Link>
@@ -173,8 +194,6 @@ export default function Navbar({ hideOn = [] }: NavbarProps) {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            
-
             {!isAuthenticated ? (
               <Link
                 href="/login"

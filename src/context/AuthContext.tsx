@@ -1,4 +1,3 @@
-// src/context/AuthContext.tsx
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -22,9 +21,7 @@ export type User = {
 };
 
 type LoginOverload =
-  // новий спосіб: креди + прапорець remember
   ((username: string, password: string, remember?: boolean) => Promise<void>) |
-  // старий спосіб: готові токени
   ((access: string, refresh?: string | null) => Promise<void>);
 
 export interface AuthContextType {
@@ -33,6 +30,7 @@ export interface AuthContextType {
   user: User | null;
   login: LoginOverload;
   logout: () => void;
+  bootstrapped: boolean; // ← добавили
 }
 
 /* =========================
@@ -44,6 +42,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   login: async () => {},
   logout: () => {},
+  bootstrapped: false,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -55,11 +54,9 @@ const inBrowser = typeof window !== 'undefined';
 
 function readStored(key: 'access' | 'refresh'): string | null {
   if (!inBrowser) return null;
-  // спершу шукаємо в sessionStorage, потім у localStorage
   return sessionStorage.getItem(key) ?? localStorage.getItem(key);
 }
 
-/** Куди писати токени — в local чи session — вирішуємо прапорцем remember */
 function writeStored(key: 'access' | 'refresh', value: string | null, remember: boolean) {
   if (!inBrowser) return;
   const target = remember ? localStorage : sessionStorage;
@@ -70,7 +67,7 @@ function writeStored(key: 'access' | 'refresh', value: string | null, remember: 
     other.removeItem(key);
   } else {
     target.setItem(key, value);
-    other.removeItem(key); // тримаємо токен лише в одному місці
+    other.removeItem(key);
   }
 }
 
@@ -84,10 +81,8 @@ function looksLikeJwt(t?: string | null) {
   return !!t && t.split('.').length === 3;
 }
 
-/** Визначаємо, чи "remember" був true, дивлячись де лежить refresh */
 function rememberFromRefreshStorage(): boolean {
   if (!inBrowser) return true;
-  // якщо refresh у localStorage → remember = true, інакше (session) → false
   return localStorage.getItem('refresh') != null;
 }
 
@@ -99,25 +94,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [rememberFlag, setRememberFlag] = useState<boolean>(true);
   const [user, setUser]                 = useState<User | null>(null);
+  const [bootstrapped, setBootstrapped] = useState(false); // ←
 
-  // 1) Старт: синхронно підхопити токени
+  // 1) Старт: синхронно підхопити токени і, якщо треба, рефрешнути
   useEffect(() => {
     const a = readStored('access');
     const r = readStored('refresh');
 
     setAccessToken(a);
     setRefreshToken(r);
-
-    // визначаємо remember за місцем зберігання refresh
     if (inBrowser) setRememberFlag(rememberFromRefreshStorage());
-
-    // одразу прокидуємо в axios
     setAuthHeader(a || null);
 
-    // якщо access відсутній, але є refresh — спробуємо проактивно оновити токен
     (async () => {
-      if (!a && r) {
-        try {
+      try {
+        if (!a && r) {
           const res = await axios.post(`${API_BASE}${REFRESH_URL}`, { refresh: r });
           const newAccess: string | null = res.data?.access || null;
 
@@ -134,13 +125,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             setRefreshToken(null);
             setUser(null);
           }
-        } catch {
-          clearAllTokens();
-          setAuthHeader(null);
-          setAccessToken(null);
-          setRefreshToken(null);
-          setUser(null);
         }
+      } catch {
+        clearAllTokens();
+        setAuthHeader(null);
+        setAccessToken(null);
+        setRefreshToken(null);
+        setUser(null);
+      } finally {
+        setBootstrapped(true); // ← контекст готов к использованию в UI
       }
     })();
   }, []);
@@ -174,11 +167,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const password   = b ?? '';
       const rememberMe = !!remember;
 
-      // логінимось БЕЗ інтерцептора (прямий виклик)
       const res  = await axios.post(`${API_BASE}${LOGIN_URL}`, { username, password });
       const data = res.data || {};
 
-      // підтримуємо різні формати відповіді
       const access =
         data.access ??
         data.access_token ??
@@ -228,7 +219,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       throw new Error('login(access, refresh): "access" некоректний. Викличте login(username, password, remember).');
     }
 
-    // використовуємо поточний rememberFlag (де вже лежать токени — там і лишаємо)
     writeStored('access', access, rememberFlag);
     if (refresh) writeStored('refresh', refresh, rememberFlag);
 
@@ -262,6 +252,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         user,
         login,
         logout,
+        bootstrapped,
       }}
     >
       {children}

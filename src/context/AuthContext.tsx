@@ -30,7 +30,8 @@ export interface AuthContextType {
   user: User | null;
   login: LoginOverload;
   logout: () => void;
-  bootstrapped: boolean; // ← добавили
+  /** Контекст начитался и синхронизировался с хранилищами */
+  bootstrapped: boolean;
 }
 
 /* =========================
@@ -57,6 +58,7 @@ function readStored(key: 'access' | 'refresh'): string | null {
   return sessionStorage.getItem(key) ?? localStorage.getItem(key);
 }
 
+/** Куди писати токени — в local чи session — вирішуємо прапорцем remember */
 function writeStored(key: 'access' | 'refresh', value: string | null, remember: boolean) {
   if (!inBrowser) return;
   const target = remember ? localStorage : sessionStorage;
@@ -81,6 +83,7 @@ function looksLikeJwt(t?: string | null) {
   return !!t && t.split('.').length === 3;
 }
 
+/** Визначаємо, чи "remember" був true, дивлячись де лежить refresh */
 function rememberFromRefreshStorage(): boolean {
   if (!inBrowser) return true;
   return localStorage.getItem('refresh') != null;
@@ -94,9 +97,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [refreshToken, setRefreshToken] = useState<string | null>(null);
   const [rememberFlag, setRememberFlag] = useState<boolean>(true);
   const [user, setUser]                 = useState<User | null>(null);
-  const [bootstrapped, setBootstrapped] = useState(false); // ←
+  const [bootstrapped, setBootstrapped] = useState(false);
 
-  // 1) Старт: синхронно підхопити токени і, якщо треба, рефрешнути
+  // 1) Первичная инициализация токенов и возможный refresh
   useEffect(() => {
     const a = readStored('access');
     const r = readStored('refresh');
@@ -133,17 +136,43 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setRefreshToken(null);
         setUser(null);
       } finally {
-        setBootstrapped(true); // ← контекст готов к использованию в UI
+        setBootstrapped(true);
       }
     })();
   }, []);
 
-  // 2) Будь-яка зміна accessToken → оновлюємо заголовок інстанса
+  // 2) Быстрая автосинхронизация на случай, когда после логина сделали router.replace('/profile'),
+  //    но login-page НЕ вызывает контекстный login()
+  useEffect(() => {
+    if (!inBrowser) return;
+    // короткий "мягкий" поллинг в первые 2 секунды после монтирования,
+    // чтобы подхватить токены, записанные страницей логина перед редиректом
+    let ticks = 0;
+    const id = window.setInterval(() => {
+      ticks++;
+      const a = readStored('access');
+      const r = readStored('refresh');
+      if (a && a !== accessToken) {
+        setAccessToken(a);
+        setAuthHeader(a);
+      }
+      if (r && r !== refreshToken) {
+        setRefreshToken(r);
+      }
+      if (ticks >= 10 || a) {
+        window.clearInterval(id);
+      }
+    }, 200);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 3) Любая смена accessToken → обновляем заголовок http-инстанса
   useEffect(() => {
     setAuthHeader(accessToken || null);
   }, [accessToken]);
 
-  // 3) Тягнемо профіль, коли зʼявився access
+  // 4) Тянем профайл, когда появился access
   useEffect(() => {
     if (!accessToken) {
       setUser(null);
@@ -161,7 +190,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   async function loginImpl(a: string, b?: string, remember?: boolean): Promise<void> {
     const isCredentialsMode = typeof remember === 'boolean';
 
-    // Режим 1: логін по username/password (+ remember)
     if (isCredentialsMode) {
       const username   = a;
       const password   = b ?? '';
@@ -191,17 +219,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         throw new Error('Сервер не повернув коректний JWT access-токен.');
       }
 
-      // зберегти в storage згідно remember
       writeStored('access', access, rememberMe);
       if (refresh) writeStored('refresh', refresh, rememberMe);
 
-      // в памʼять та в axios
       setAuthHeader(access);
       setAccessToken(access);
       setRefreshToken(refresh);
       setRememberFlag(rememberMe);
 
-      // перший прогрів профілю
       try {
         const me = await http.get(ME_URL);
         setUser(me.data as User);
@@ -211,7 +236,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       return;
     }
 
-    // Режим 2: старий API — передають готові токени
+    // Старый режим — готовые токены
     const access  = a;
     const refresh = b || null;
 

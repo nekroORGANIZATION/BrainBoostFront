@@ -67,7 +67,7 @@ export default function LoginPage() {
       await http.get(ME_URL).catch(() => {});
 
       // 4) редірект
-      router.push('/profile');
+      router.push('/courses');
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||

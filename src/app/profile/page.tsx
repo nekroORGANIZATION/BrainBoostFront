@@ -8,6 +8,8 @@ import { mediaUrl } from '@/lib/media';
 import { motion, AnimatePresence, type Variants, type Transition } from 'framer-motion';
 import { PencilLine, Check, X, Upload, Crown, ShieldCheck, GraduationCap, BookOpen, LogIn, Star } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 /* =========================
    Типи
 ========================= */
@@ -38,7 +40,7 @@ type Course = {
 /* =========================
    Константи API
 ========================= */
-const PURCHASED_URL_PRIMARY = '/courses/me/purchased/';   // DRF (root)
+const PURCHASED_URL_PRIMARY = '/courses/me/purchased/';     // DRF (root)
 const PURCHASED_URL_FALLBACK = '/api/courses/me/purchased/'; // DRF під /api
 
 /* =========================
@@ -65,7 +67,7 @@ const listItem: Variants = {
    Компонент
 ========================= */
 export default function ProfilePage() {
-  const { accessToken } = useAuth();
+  const { accessToken, bootstrapped } = useAuth();
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -83,17 +85,27 @@ export default function ProfilePage() {
     profile_picture: null as File | null,
   });
 
-  /* важливо: навішуємо токен в axios відразу після появи */
-  useEffect(() => {
-    if (accessToken) setAuthHeader(accessToken);
-  }, [accessToken]);
+  // Токен из storage на случай мгновенного redirect после логина
+  const storageToken = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return sessionStorage.getItem('access') ?? localStorage.getItem('access');
+  }, []);
 
-  useEffect(() => {
-    // 1) чекаємо ініціалізацію контексту (undefined)
-    if (typeof accessToken === 'undefined') return;
+  // Эффективный токен: из контекста или из storage
+  const effectiveToken = accessToken ?? storageToken ?? null;
 
-    // 2) без токена не ходимо в API
-    if (!accessToken) {
+  // Навешиваем токен в axios, как только он есть (из любого источника)
+  useEffect(() => {
+    setAuthHeader(effectiveToken || null);
+  }, [effectiveToken]);
+
+  // Грузим профиль и покупки, когда появился токен
+  useEffect(() => {
+    // ждём инициализацию контекста, чтобы не мигало
+    if (!bootstrapped) return;
+
+    // без токена — сбрасываем состояние и показываем экран входа
+    if (!effectiveToken) {
       setLoading(false);
       setProfile(null);
       setCourses([]);
@@ -136,7 +148,6 @@ export default function ProfilePage() {
           : pc.data?.results || pc.data?.data || pc.data?.items || [];
 
         const mapped: Course[] = rawList.map((row: any) => {
-          // підтримка PurchasedCourse: { user, course, ... }
           const c = row?.course ?? row;
           return {
             id: c?.id,
@@ -152,12 +163,8 @@ export default function ProfilePage() {
 
         setCourses(mapped);
       } catch (e: any) {
-        // ІГНОРУЄМО abort від axios (інакше бачили "canceled")
-        if (e?.message === 'canceled' || e?.code === 'ERR_CANCELED') {
-          return;
-        }
+        if (e?.message === 'canceled' || e?.code === 'ERR_CANCELED') return;
 
-        // 401/403 — акуратне повідомлення
         const status = e?.response?.status;
         if (status === 401 || status === 403) {
           setError('Сеанс недійсний або закінчився. Увійдіть знову.');
@@ -181,7 +188,7 @@ export default function ProfilePage() {
 
     load();
     return () => controller.abort();
-  }, [accessToken]);
+  }, [bootstrapped, effectiveToken]);
 
   // Хендлери форми
   function handleTextChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -198,7 +205,7 @@ export default function ProfilePage() {
   }
 
   async function handleUpdate() {
-    if (!accessToken) return;
+    if (!effectiveToken) return;
     setSaving(true);
     setError(null);
 
@@ -217,9 +224,7 @@ export default function ProfilePage() {
       setProfile(res.data);
       setEditMode(false);
     } catch (e: any) {
-      if (e?.message === 'canceled' || e?.code === 'ERR_CANCELED') {
-        // ігноруємо аборт
-      } else {
+      if (e?.message !== 'canceled' && e?.code !== 'ERR_CANCELED') {
         setError(
           e?.response?.data
             ? typeof e.response.data === 'string'
@@ -247,8 +252,8 @@ export default function ProfilePage() {
     );
   }
 
-  // ініціалізація контексту (accessToken === undefined)
-  if (typeof accessToken === 'undefined') {
+  // 1) Поки контекст ще не ініціалізувався — скелетон
+  if (!bootstrapped) {
     return (
       <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
         <div className="max-w-[1100px] mx-auto p-6">
@@ -258,8 +263,8 @@ export default function ProfilePage() {
     );
   }
 
-  // Екран "потрібен вхід"
-  if (!accessToken) {
+  // 2) Немає жодного токена (ні в контексті, ні в storage) — просимо увійти
+  if (!effectiveToken) {
     return (
       <main className="min-h-screen bg-[url('/images/back.png')] bg-cover bg-top">
         <motion.div className="max-w-[1100px] mx-auto p-6" initial="hidden" animate="show" variants={fadeUp}>

@@ -695,7 +695,7 @@ function StoriesRibbon({ y, x }: { y: number; x: number }) {
             >
               {items.map((it) => (
                 <div key={it.id} style={{ position: 'relative', width: CARD_W, height: CARD_H, borderRadius: 20, overflow: 'hidden', flex: '0 0 auto' }}>
-                  <FixedImg src={it.cover || '/images/placeholder.png'} alt={it.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <FixedImg src={it.cover || '/images/placeholder.jpg'} alt={it.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,37,120,0) 40%, rgba(10,37,120,.55) 100%)' }} />
                   <div style={{ position: 'absolute', left: 16, top: 16, padding: '4px 8px', borderRadius: 34, border: '1px solid #fff', color: '#fff', fontFamily: 'Mulish', fontSize: 12 }}>
                     Історії

@@ -6,12 +6,47 @@ import http, { API_BASE } from '@/lib/http';
 import FooterCard from "@/components/FooterCard";
 
 /* =========================================================
-   Утіліти та стилі
+   УТИЛІТИ ДЛЯ URL
 ========================================================= */
+// Абсолютні URL (http/https, data:, blob:, protocol-relative)
 const isAbs = (u?: string) =>
-  !!u && (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:'));
-const murl = (u?: string) => (!u ? '' : isAbs(u) ? u : `${API_BASE}${u.startsWith('/') ? '' : '/'}${u}`);
+  !!u && (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('//'));
 
+// База бекенда (БЕЗ кінцевого /). ORIGIN = домен без суфікса /api
+const RAW_BASE = (API_BASE || '').replace(/\/+$/, '');
+const CONF_ORIGIN = RAW_BASE.replace(/\/api$/i, '');
+
+// Отримати origin у рантаймі (для локалки, коли API_BASE не вказаний)
+const getOrigin = () => (CONF_ORIGIN || (typeof window !== 'undefined' ? window.location.origin : ''));
+
+// Нормалізація одного рядка URL:
+const murl = (u?: string) => {
+  if (!u) return '';
+  if (isAbs(u)) return u;                        // вже абсолютний
+  if (u.startsWith('//')) return `https:${u}`;   // protocol-relative → https
+
+  // фронтові файли з /public — віддає сам Next
+  if (u.startsWith('/images/') || u.startsWith('/course_image/') || u.startsWith('/favicon') || u.startsWith('/icons/')) {
+    return u;
+  }
+
+  const ORIGIN = getOrigin();
+
+  // backend media/static — додаємо ORIGIN
+  if (u.startsWith('/media/') || u.startsWith('/static/')) {
+    return `${ORIGIN}${u}`;
+  }
+  if (u.startsWith('media/') || u.startsWith('static/')) {
+    return `${ORIGIN}/${u}`;
+  }
+
+  // інше — лишаємо як є
+  return u;
+};
+
+/* =========================================================
+   КОНСТАНТИ СТИЛЮ
+========================================================= */
 const CONTAINER = 'mx-auto w-full max-w-[1160px] px-4 sm:px-6 md:px-[118px]';
 const CARD20 = 'rounded-[20px] bg-white ring-1 ring-[#E5ECFF] p-5 shadow-[0_8px_24px_rgba(2,28,78,0.06)]';
 const CARD16 = 'rounded-[16px] bg-white ring-1 ring-[#E5ECFF] p-4 shadow-[0_6px_22px_rgba(2,28,78,0.08)]';
@@ -19,6 +54,9 @@ const INPUT = 'rounded-[10px] ring-1 ring-[#E5ECFF] px-3 py-2 outline-none focus
 const BTN_PRIMARY = 'px-5 py-2 rounded-[10px] bg-[#1345DE] text-white font-semibold disabled:opacity-60';
 const BTN_GHOST = 'px-4 py-2 rounded-[10px] ring-1 ring-[#E5ECFF] bg-white';
 
+/* =========================================================
+   ДРІБНІ КОМПОНЕНТИ
+========================================================= */
 function Star({ filled = false, size = 18 }: { filled?: boolean; size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size}
@@ -55,7 +93,7 @@ const Badge = ({ children }: { children: React.ReactNode }) => (
 );
 
 /* =========================================================
-   Типи під твій бек
+   ТИПИ
 ========================================================= */
 type ReviewApi = {
   id: number;
@@ -78,8 +116,8 @@ type ReviewUI = {
   rating: number;
   date: string;
   text: string;
-  avatar?: string;
-  images?: string[];
+  avatar: string;     // завжди рядок (з дефолтом)
+  images: string[];   // завжди масив
   video?: string;
 };
 
@@ -91,7 +129,7 @@ type PurchaseApi = {
 };
 
 /* =========================================================
-   Хелпери
+   ХЕЛПЕРИ
 ========================================================= */
 const safeGetArray = <T,>(raw: any): T[] =>
   Array.isArray(raw) ? (raw as T[]) : (raw?.results && Array.isArray(raw.results) ? (raw.results as T[]) : []);
@@ -109,13 +147,13 @@ const toUI = (r: ReviewApi, courseTitle?: string): ReviewUI => ({
   rating: Number(r.rating) || 0,
   date: r.created_at,
   text: r.text,
-  avatar: r.user_avatar ? murl(r.user_avatar) : undefined,
-  images: (r.images || []).map((i) => murl(i.image)).filter(Boolean),
+  avatar: r.user_avatar ? murl(r.user_avatar) : '/images/defuser.png',
+  images: Array.isArray(r.images) ? r.images.map((i) => murl(i.image)).filter(Boolean) : [],
   video: r.video_url || undefined,
 });
 
 /* =========================================================
-   Сторінка
+   ГОЛОВНИЙ КОМПОНЕНТ
 ========================================================= */
 export default function ReviewsPage() {
   // дані
@@ -311,7 +349,7 @@ export default function ReviewsPage() {
   }
 
   /* =========================================================
-     Рендер
+     РЕНДЕР
   ========================================================= */
   return (
     <main className="min-h-screen bg-[url('/images/back.png')] bg-top bg-cover">
@@ -398,8 +436,6 @@ export default function ReviewsPage() {
                   Коротка історія студента: що вивчив, як складав портфоліо, і як отримав офер.
                 </p>
               </div>
-
-              
             </div>
           </div>
         </div>
@@ -649,7 +685,7 @@ export default function ReviewsPage() {
 }
 
 /* =========================================================
-   Дрібні картки / елементи
+   ДРІБНІ КАРТКИ / ЕЛЕМЕНТИ
 ========================================================= */
 const SkeletonCard = () => (
   <div className={CARD20 + ' animate-pulse'}>
@@ -704,9 +740,10 @@ function ReviewCard({ r }: { r: ReviewUI }) {
     <article className={CARD20}>
       <div className="flex items-start gap-4">
         <img
-          src={murl(r.avatar) || '/images/avatar1.png'}
+          src={r.avatar || '/images/defuser.png'}
           alt={r.name}
           className="h-12 w-12 rounded-full ring-2 ring-white object-cover"
+          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/defuser.png'; }}
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -721,11 +758,17 @@ function ReviewCard({ r }: { r: ReviewUI }) {
 
           <p className="mt-3 whitespace-pre-line text-slate-800">{r.text}</p>
 
-          {(r.images?.length || r.video) && (
+          {(r.images.length > 0 || r.video) && (
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {r.images?.map((src, i) => (
+              {r.images.map((src, i) => (
                 <div key={i} className="overflow-hidden rounded-[12px] ring-1 ring-[#E5ECFF]">
-                  <img src={murl(src)} alt="" className="h-40 w-full object-cover sm:h-32" loading="lazy" />
+                  <img
+                    src={src}
+                    alt=""
+                    className="h-40 w-full object-cover sm:h-32"
+                    loading="lazy"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/images/placeholder.jpg'; }}
+                  />
                 </div>
               ))}
               {r.video && (

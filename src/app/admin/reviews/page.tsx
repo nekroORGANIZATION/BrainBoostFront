@@ -6,7 +6,14 @@ import http, { API_BASE } from '@/lib/http';
 import { CheckCircle2, XCircle, RotateCw, Trash2, ExternalLink, ChevronDown } from "lucide-react";
 
 // 🔽 общий медиахелпер
-import { mediaUrl, avatarUrl } from '@/lib/media';
+import { mediaUrl } from '@/lib/media';
+
+// Локальний хелпер для аватарів
+function avatarUrl(u?: string) {
+  if (!u) return '/images/defuser.png';
+  if (/^https?:\/\//i.test(u) || u.startsWith('data:') || u.startsWith('blob:')) return u;
+  return `${API_BASE}/media/${u}`;
+}
 
 /* =========================
    Конфіг

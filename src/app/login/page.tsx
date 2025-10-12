@@ -189,14 +189,14 @@ export default function LoginPage() {
 
           <div className="my-6 text-center text-gray-500 text-sm">або</div>
 
-          <button
+          {/*<button
             onClick={handleGoogleLogin}
             type="button"
             className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-xl hover:bg-gray-100 transition"
           >
             <img src="/images/google-login.png" alt="Google" className="w-5 h-5" />
             <span className="text-sm font-medium">Увійти через Google</span>
-          </button>
+          </button>*/}
 
           <div className="text-center text-sm text-gray-500 mt-6">
             Немає акаунту?{' '}

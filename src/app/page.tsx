@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import http from '@/lib/http';
-import { mediaUrl } from '@/lib/media';
+import { mediaUrl, storyCoverUrl } from '@/lib/media';
 import FooterCard from '@/components/FooterCard';
 import { ProgramsRibbon, CourseItem } from '@/components/ProgramsRibbon';
 import { Tile } from '@/components/Tile';
@@ -298,7 +298,7 @@ function EventsBlock({ events }: { events: EventItem[] }) {
       {/* Заголовок всіх подій */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 40 }}>
         <Text
-          text="Найближчі заходи"
+          text="Найближчі заходи*"
           fz={isMobile ? 24 : 36}
           lh={isMobile ? 32 : 48}
           fw={700}
@@ -590,6 +590,13 @@ function BigCounterBlock() {
 /* =========================
    Стрічка «Історії»
 ========================= */
+/* =========================
+   Стрічка «Історії»
+========================= */
+
+/* =========================
+   Стрічка «Історії»
+========================= */
 function StoriesRibbon({ y, x }: { y: number; x: number }) {
   const CARD_W_DESKTOP = 616;
   const CARD_H_DESKTOP = 440;
@@ -623,7 +630,8 @@ function StoriesRibbon({ y, x }: { y: number; x: number }) {
         const normalized: StoryItem[] = raw.map((s: any) => ({
           id: Number(s.id),
           title: String(s.title || ''),
-          cover: s.cover || null,
+          // КЛЮЧОВЕ: линкуємо локальну картинку по basename (як курси)
+          cover: mediaUrl(s.cover || ''), // -> "/course_image/<basename>"
         }));
         if (!cancelled) setItems(normalized);
       } catch {
@@ -693,37 +701,44 @@ function StoriesRibbon({ y, x }: { y: number; x: number }) {
                 paddingBottom: 2,
               }}
             >
-              {items.map((it) => (
-                <div key={it.id} style={{ position: 'relative', width: CARD_W, height: CARD_H, borderRadius: 20, overflow: 'hidden', flex: '0 0 auto' }}>
-                  <FixedImg src={it.cover || '/images/placeholder.jpg'} alt={it.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,37,120,0) 40%, rgba(10,37,120,.55) 100%)' }} />
-                  <div style={{ position: 'absolute', left: 16, top: 16, padding: '4px 8px', borderRadius: 34, border: '1px solid #fff', color: '#fff', fontFamily: 'Mulish', fontSize: 12 }}>
-                    Історії
+              {items.map((it) => {
+                const coverSrc = it.cover || '/images/placeholder.jpg'; // it.cover вже "/course_image/<file>"
+                return (
+                  <div key={it.id} style={{ position: 'relative', width: CARD_W, height: CARD_H, borderRadius: 20, overflow: 'hidden', flex: '0 0 auto' }}>
+                    <FixedImg
+                      src={coverSrc}
+                      alt={it.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(10,37,120,0) 40%, rgba(10,37,120,.55) 100%)' }} />
+                    <div style={{ position: 'absolute', left: 16, top: 16, padding: '4px 8px', borderRadius: 34, border: '1px solid #fff', color: '#fff', fontFamily: 'Mulish', fontSize: 12 }}>
+                      Історії
+                    </div>
+                    <div style={{ position: 'absolute', left: 16, bottom: 48, width: CARD_W - 32, color: '#fff', fontFamily: 'Mulish', fontWeight: 700, fontSize: isMobile ? 14 : 20, lineHeight: '25px', textShadow: '0 2px 8px rgba(0,0,0,.35)' }}>
+                      {it.title}
+                    </div>
+                    <Link href={`/stories/${it.id}`} style={{
+                      position: 'absolute',
+                      left: 16,
+                      bottom: 16,
+                      width: 120,
+                      height: 32,
+                      borderRadius: 34,
+                      background: '#82A1FF',
+                      color: '#fff',
+                      fontFamily: 'Mulish',
+                      fontWeight: 600,
+                      fontSize: isMobile ? 12 : 14,
+                      lineHeight: isMobile ? '32px' : '36px',
+                      textAlign: 'center',
+                      textDecoration: 'none',
+                      boxShadow: '0 8px 20px rgba(130,161,255,.35)',
+                    }}>
+                      Читати історію
+                    </Link>
                   </div>
-                  <div style={{ position: 'absolute', left: 16, bottom: 48, width: CARD_W - 32, color: '#fff', fontFamily: 'Mulish', fontWeight: 700, fontSize: isMobile ? 14 : 20, lineHeight: '25px', textShadow: '0 2px 8px rgba(0,0,0,.35)' }}>
-                    {it.title}
-                  </div>
-                  <Link href={`/stories/${it.id}`} style={{
-                    position: 'absolute',
-                    left: 16,
-                    bottom: 16,
-                    width: 120,
-                    height: 32,
-                    borderRadius: 34,
-                    background: '#82A1FF',
-                    color: '#fff',
-                    fontFamily: 'Mulish',
-                    fontWeight: 600,
-                    fontSize: isMobile ? 12 : 14,
-                    lineHeight: isMobile ? '32px' : '36px',
-                    textAlign: 'center',
-                    textDecoration: 'none',
-                    boxShadow: '0 8px 20px rgba(130,161,255,.35)',
-                  }}>
-                    Читати історію
-                  </Link>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -756,6 +771,8 @@ function StoriesRibbon({ y, x }: { y: number; x: number }) {
     </div>
   );
 }
+
+
 
 /* =========================
    Статистика + партнери

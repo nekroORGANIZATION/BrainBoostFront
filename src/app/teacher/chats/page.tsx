@@ -119,18 +119,36 @@ export default function TeacherChatsPage() {
           {/* Top brand + search */}
           <div className="px-5 pt-5 pb-3 border-b border-[#E5ECFF]/70">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 grid place-items-center text-white shadow-md">
-                  <MessageSquareText className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="text-xs text-slate-600">Панель викладача</div>
-                  <div className="text-lg font-extrabold text-[#021C4E] leading-tight">Мої чати</div>
-                </div>
-              </div>
-              <div className="hidden sm:flex items-center gap-1 text-indigo-600/80 text-xs px-2 py-1 rounded-lg bg-indigo-50 ring-1 ring-indigo-200">
-                <Sparkles className="w-3.5 h-3.5" /> новий дизайн
-              </div>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  {/* Ліва частина: іконка + заголовки */}
+  <div className="flex items-center gap-3 sm:min-w-0 sm:flex-1">
+    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 grid place-items-center text-white shadow-md">
+      <MessageSquareText className="w-5 h-5" />
+    </div>
+    <div className="min-w-0 text-center sm:text-left">
+      <div className="text-xs text-slate-600">Панель викладача</div>
+      <div className="text-lg font-extrabold text-[#021C4E] leading-tight truncate">Мої чати</div>
+    </div>
+  </div>
+
+  {/* Права частина: бейдж + кнопка */}
+  <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2 sm:gap-3 sm:shrink-0">
+
+    <Link
+      href="/teacher"
+      className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white text-sm font-semibold shadow-[0_10px_24px_rgba(2,28,78,0.20)] ring-1 ring-indigo-500/30 hover:brightness-110 active:translate-y-[1px] transition w-full sm:w-auto"
+      title="До панелі викладача"
+      aria-label="Перейти на головну сторінку викладача"
+    >
+      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 13h8V3H3v10Zm10 8h8v-6h-8v6ZM3 21h8v-6H3v6Zm10-8h8V3h-8v10Z" />
+      </svg>
+      <span className="hidden sm:inline">Головна викладача</span>
+      <span className="sm:hidden">Головна</span>
+    </Link>
+  </div>
+</div>
+
             </div>
 
             <div className="mt-3">

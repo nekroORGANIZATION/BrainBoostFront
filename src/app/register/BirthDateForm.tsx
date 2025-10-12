@@ -1,12 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import type { RegisterFormData } from './page';
-import { useAuth } from '@/context/AuthContext';
-import { registerUser } from '@/lib/api';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { register } from '@/services/AuthService'; // <-- ВАЖЛИВО: використовуємо твою функцію register
+
+// Тип з твоєї сторінки-майстра
+export type RegisterFormData = {
+  role: 'student' | 'teacher' | '' ;
+  name: string;
+  email: string;
+  password: string;
+  birthDate: string; // YYYY-MM-DD
+};
 
 type Props = {
   onBack: () => void;
@@ -34,13 +42,13 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
 
   const monthsUA = useMemo(
     () => [
-      'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-      'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня',
+      'січня','лютого','березня','квітня','травня','червня',
+      'липня','серпня','вересня','жовтня','листопада','грудня',
     ],
     []
   );
 
-  // підрахунок віку + запис у formData у форматі ISO (YYYY-MM-DD)
+  // Підрахунок віку + синхронізація ISO-дати в майстер-формі
   useEffect(() => {
     const d = Number(day), m = Number(month), y = Number(year);
     if (!d || !m || !y) return;
@@ -48,10 +56,8 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
     const birth = new Date(y, m - 1, d);
     if (Number.isNaN(birth.getTime())) return;
 
-    // якщо дата некоректна (31.04 тощо) — не оновлюємо
-    if (birth.getDate() !== d || birth.getMonth() !== m - 1 || birth.getFullYear() !== y) {
-      return;
-    }
+    // відсікаємо неможливі дати типу 31.04
+    if (birth.getDate() !== d || birth.getMonth() !== m - 1 || birth.getFullYear() !== y) return;
 
     const today = new Date();
     let a = today.getFullYear() - y;
@@ -75,49 +81,77 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
     return null;
   };
 
-  const handleSubmit = async () => {
+  async function handleSubmit() {
     const msg = validateAll();
     if (msg) { setError(msg); return; }
 
     setError(null);
     setBusy(true);
     try {
-      const res = await registerUser(
-        values.role as 'student' | 'teacher',
+      // Використовуємо твою функцію register(...)
+      const data = await register(
+        values.role,
         values.name,
         values.email,
         values.password,
-        values.birthDate // у форматі YYYY-MM-DD
+        values.birthDate, // YYYY-MM-DD
       );
 
-      // якщо бек повернув токени — логінимо одразу
-      if (res?.access && res?.refresh) {
-        login(res.access, res.refresh);
+      // Якщо бек одразу повертає токени — логінимось прозоро
+      const access =
+        data?.access ??
+        data?.access_token ??
+        data?.tokens?.access ??
+        null;
+
+      const refresh =
+        data?.refresh ??
+        data?.refresh_token ??
+        data?.tokens?.refresh ??
+        null;
+
+      if (access) {
+        // режим login(access, refresh)
+        await (login as (a: string, r?: string | null) => Promise<void>)(access, refresh ?? null);
         router.push('/profile');
         return;
       }
 
-      // інакше ведемо на логін із позначкою успіху
+      // Інакше — на логін з прапорцем про успішну реєстрацію
       router.push('/login?registered=1');
     } catch (e: any) {
-      // намагаємось витягнути меседж із axios response
-      const msg =
-        e?.response?.data?.detail ||
-        e?.response?.data?.error ||
-        (typeof e?.response?.data === 'string' ? e.response.data : null) ||
+      // Витягнемо читабельну помилку з бекенда
+      const resp = e?.response?.data;
+      let msg =
+        (typeof resp === 'string' && resp) ||
+        resp?.detail ||
         e?.message ||
         'Помилка реєстрації.';
+
+      // Якщо бек повернув помилки полів об’єктом — склеїмо їх
+      if (!msg || msg === 'Помилка реєстрації.') {
+        if (resp && typeof resp === 'object') {
+          const parts = Object.entries(resp).map(([k, v]) => {
+            const text = Array.isArray(v) ? v.join(' ') : String(v);
+            return `${k}: ${text}`;
+          });
+          if (parts.length) msg = parts.join(' | ');
+        }
+      }
       setError(String(msg));
     } finally {
       setBusy(false);
     }
-  };
+  }
 
   return (
     <div className="flex items-center justify-center h-screen bg-white relative overflow-hidden">
-      <Link href="/" aria-label="На головну"
+      <Link
+        href="/"
+        aria-label="На головну"
         className="absolute left-6 top-6 z-50 inline-flex items-center rounded-xl
-                  bg-white/70 backdrop-blur px-3 py-2 ring-1 ring-black/5 hover:bg-white/80">
+                   bg-white/70 backdrop-blur px-3 py-2 ring-1 ring-black/5 hover:bg-white/80"
+      >
         <Image
           src="/images/logo.png"
           alt="Brand logo"
@@ -127,11 +161,10 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
           className="select-none"
         />
       </Link>
+
+      {/* Декор */}
       <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-700" style={{ clipPath: 'polygon(0 100%, 0 0, 100% 100%)' }} />
-      <div
-        className="absolute top-1/2 right-0 w-[350px] h-[300px] bg-blue-700 -translate-y-1/2"
-        style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }}
-      />
+      <div className="absolute top-1/2 right-0 w-[350px] h-[300px] bg-blue-700 -translate-y-1/2" style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }} />
 
       <div
         className="bg-white flex flex-col items-center justify-between rounded-2xl border border-gray-100 shadow md:shadow-none"
@@ -188,7 +221,11 @@ export default function BirthDateForm({ onBack, updateData, values }: Props) {
           <span>{age !== null ? `${age} років` : ''}</span>
         </div>
 
-        {error && <div className="text-red-600 text-sm font-medium mb-2 px-4 text-center">{error}</div>}
+        {error && (
+          <div className="text-red-600 text-sm font-medium mb-2 px-4 text-center">
+            {error}
+          </div>
+        )}
 
         <div className="flex gap-3 mb-8">
           <button
